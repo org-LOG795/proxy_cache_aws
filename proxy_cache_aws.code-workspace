@@ -1,0 +1,50 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+	},
+	"extensions": {
+		"recommendations": [
+			"rust-lang.rust-analyzer",
+			"vadimcn.vscode-lldb"
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Start debug",
+				"type": "lldb",
+				"request": "launch",
+				"program": "${workspaceFolder}/target/debug/proxy_cache_aws",
+				"args": [],
+				"envFile": "${workspaceFolder}/dev.env",
+				"cwd": "${workspaceFolder}",
+				"preLaunchTask": "Build app debug"
+			}
+		],
+		"compounds": []
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "Build app debug",
+				"type": "shell",
+				"command": "cargo",
+				"args": ["build"],
+				"problemMatcher": [
+					"$tsc"
+				],
+				"presentation": {
+					"reveal": "silent",
+					"close": true
+				},
+				"group": "build"
+			}
+		]
+	}
+}
