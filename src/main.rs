@@ -17,7 +17,7 @@ struct Config {
 }
 
 fn create_addr() -> SocketAddr {
-    let host = env::var("APP_HOST").unwrap_or("127.0.0.1".to_string());
+    let host = env::var("APP_HOST").unwrap_or("0.0.0.0".to_string());
     let port = env::var("APP_PORT").unwrap_or("5000".to_string());
     let addr_str = format!("{}:{}", host, port);
     addr_str.parse().unwrap_or_else(|_| panic!("{} is not a valid addr", addr_str))
