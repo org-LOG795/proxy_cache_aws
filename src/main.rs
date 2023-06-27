@@ -2,6 +2,8 @@ mod middlewares;
 mod facades;
 
 use axum::{
+    body::Body,
+    http::Request,
     response::Html, 
     routing::get,
     Router,
@@ -11,9 +13,30 @@ use axum::{
 use std::{env, net::SocketAddr};
 use middlewares::tracing::tracing_middleware;
 
+use opentelemetry::global::shutdown_tracer_provider;
+use opentelemetry::sdk::Resource;
+use opentelemetry::trace::TraceError;
+use opentelemetry::{global, sdk::trace as sdktrace};
+use opentelemetry::{trace::Tracer};
+use opentelemetry_otlp::WithExportConfig;
+use std::error::Error;
+use opentelemetry_http::HeaderExtractor;
+
+
+
 #[derive(Clone)]
 struct Config {
     secret: String,
+}
+
+fn init_tracer() -> Result<sdktrace::Tracer, TraceError> {
+    opentelemetry_otlp::new_pipeline()
+        .tracing()
+        .with_exporter(opentelemetry_otlp::new_exporter().tonic().with_env())
+        .with_trace_config(
+            sdktrace::config().with_resource(Resource::default()),
+        )
+        .install_batch(opentelemetry::runtime::Tokio)
 }
 
 fn create_addr() -> SocketAddr {
@@ -23,9 +46,10 @@ fn create_addr() -> SocketAddr {
     addr_str.parse().unwrap_or_else(|_| panic!("{} is not a valid addr", addr_str))
 }
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    let _ = init_tracer()?;
     let secret_test = Config {secret: "olo".to_string()};
-
+   
     // build our application with a route
     let app = Router::new()
         .route("/", get(handler))
@@ -42,9 +66,17 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
+
+    shutdown_tracer_provider();
+    Ok(())
 }
 
-async fn handler() -> Html<&'static str> {
+
+async fn handler(req: Request<Body>) -> Html<&'static str> {
+    //let parent_cx = global::get_text_map_propagator(|propagator| {
+       // propagator.extract(&HeaderExtractor(req.headers()))
+    //});
+    //tracer.start_with_context("context_name", &parent_cx);
     Html("<h1>Hello, World!</h1>")
 }
 
