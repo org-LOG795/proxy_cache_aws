@@ -1,0 +1,14 @@
+name: Docker build test
+
+on:
+  pull_request:
+    branches: ["main", "dev" ]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+    
+        steps:
+        - uses: actions/checkout@v3
+        - name: Build the Docker image
+          run: docker build .
