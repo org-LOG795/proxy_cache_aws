@@ -17,6 +17,7 @@ Please mark the items below by putting an "x" inside the square brackets to indi
 - [ ] Tests have been added or updated to cover the changes.
 - [ ] Documentation has been updated to reflect the changes.
 - [ ] All existing tests are passing.
+- [ ] Docker image was successfully built locally.
 
 ## Additional Notes (if any)
 Add any additional notes or comments that can help the reviewer or provide context.
@@ -29,8 +30,7 @@ Add any additional notes or comments that can help the reviewer or provide conte
 ## Final Checklist before Merging
 Please ensure that the following items are checked before merging the pull request.
 
-- [ ] The changes have been reviewed and approved by at least one reviewer.
-- [ ] The code has been tested thoroughly and passes all tests.
+- [ ] The changes have been reviewed and approved by all reviewers.
+- [ ] The unit testing check github action passed successfully.
 - [ ] The documentation has been updated to reflect the changes.
-- [ ] The branch is up to date with the base branch.
 - [ ] The image_version file has been updated
