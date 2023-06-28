@@ -1,4 +1,4 @@
 ### PR Title
 
 The pull request title must be
-${TITLE}-
+${TITLE}-something-something
