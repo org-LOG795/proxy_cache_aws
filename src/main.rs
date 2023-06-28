@@ -58,8 +58,7 @@ async fn say_secret(State(config) : State<Config>) -> String {
 mod tests {
     use super::*;
     use std::env;
-    /// This is a simple test case that demonstrates Rust unit tests.
-    /// It verifies that the serialized point deserializes as expected. 
+
     #[test]
     fn create_valid_addr() {
         env::set_var("APP_HOST", "127.0.0.1");
