@@ -10,18 +10,19 @@ use axum::{
     middleware,
     extract::State,
 };
-use std::{env, net::SocketAddr};
-use middlewares::tracing::tracing_middleware;
-
-use opentelemetry::global::shutdown_tracer_provider;
-use opentelemetry::sdk::Resource;
-use opentelemetry::trace::TraceError;
-use opentelemetry::{global, sdk::trace as sdktrace};
-use opentelemetry::{trace::Tracer};
+use opentelemetry::{
+    global::shutdown_tracer_provider,
+    sdk::Resource,
+    trace::TraceError,
+    global, 
+    sdk::trace as sdktrace,
+    trace::Tracer,
+};
 use opentelemetry_otlp::WithExportConfig;
-use std::error::Error;
 use opentelemetry_http::HeaderExtractor;
 
+use std::{env, net::SocketAddr,error::Error};
+use middlewares::tracing::tracing_middleware;
 
 
 #[derive(Clone)]
