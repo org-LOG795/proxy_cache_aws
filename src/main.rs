@@ -63,7 +63,6 @@ mod tests {
     fn create_valid_addr() {
         env::set_var("APP_HOST", "127.0.0.1");
         env::set_var("APP_PORT", "5000");
-
         assert_eq!(create_addr().to_string(), "127.0.0.1:5000".to_string());
     }
     #[test]
