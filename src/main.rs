@@ -1,5 +1,5 @@
-mod middlewares;
-mod facades;
+pub mod middlewares;
+pub mod facades;
 
 use axum::{
     response::Html, 
@@ -8,12 +8,13 @@ use axum::{
     middleware,
     extract::State,
 };
+use middlewares::tracing::tracing_fn;
 use std::{env, net::SocketAddr};
-use middlewares::tracing::tracing_middleware;
+
 
 #[derive(Clone)]
-struct Config {
-    secret: String,
+pub struct Config {
+    pub secret: String,
 }
 
 fn create_addr() -> SocketAddr {
@@ -22,6 +23,7 @@ fn create_addr() -> SocketAddr {
     let addr_str = format!("{}:{}", host, port);
     addr_str.parse().unwrap_or_else(|_| panic!("{} is not a valid addr", addr_str))
 }
+
 #[tokio::main]
 async fn main() {
     let secret_test = Config {secret: "olo".to_string()};
@@ -30,7 +32,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(handler))
         .route("/secret", get(say_secret))
-        .layer(middleware::from_fn(tracing_middleware))
+        .layer(middleware::from_fn(tracing_fn))
         .with_state(secret_test);
 
     //Create app url
@@ -50,4 +52,25 @@ async fn handler() -> Html<&'static str> {
 
 async fn say_secret(State(config) : State<Config>) -> String {
     return config.secret;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+    /// This is a simple test case that demonstrates Rust unit tests.
+    /// It verifies that the serialized point deserializes as expected. 
+    #[test]
+    fn create_valid_addr() {
+        env::set_var("APP_HOST", "127.0.0.1");
+        env::set_var("APP_PORT", "5000");
+
+        assert_eq!(create_addr().to_string(), "127.0.0.1:5000".to_string());
+    }
+    #[test]
+    fn create_invalid_addr() {
+        env::set_var("APP_HOST", "asd2.111.222.333");
+        env::set_var("APP_PORT", "5000");
+        assert!(std::panic::catch_unwind(||create_addr()).is_err())
+    }
 }
