@@ -5,7 +5,7 @@ use axum::{
 };
 use std::time::Instant;
 
-pub async fn tracing_middleware<B>(request: Request<B>, next: Next<B>) -> Response {
+pub async fn tracing_fn<B>(request: Request<B>, next: Next<B>) -> Response {
     //Extract necessary information from the request
     let method = request.method().to_string();
     let url = request.uri().to_string();
