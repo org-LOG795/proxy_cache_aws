@@ -1,1 +1,10 @@
 /target
+*.env
+Cargo.lock
+docs
+Dockerfile
+README.md
+*.code-workspace
+.dockerignore
+.git
+.gitignore

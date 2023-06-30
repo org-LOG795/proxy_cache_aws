@@ -5,11 +5,17 @@
 		}
 	],
 	"settings": {
+		"rust-analyzer.linkedProjects": [
+			".\\Cargo.toml",
+			".\\Cargo.toml"
+		]
 	},
 	"extensions": {
 		"recommendations": [
 			"rust-lang.rust-analyzer",
-			"vadimcn.vscode-lldb"
+			"vadimcn.vscode-lldb",
+			"swellaby.vscode-rust-test-adapter",
+			"hbenl.vscode-test-explorer"
 		]
 	},
 	"launch": {
