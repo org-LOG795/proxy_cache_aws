@@ -19,6 +19,7 @@ mod compression_test {
     use std::fs;
     use flate2::read::GzDecoder;
 
+    //This is only built when we run the unit tests
     fn decompress(bytes: Vec<u8>) -> Vec<u8>
     {
         let mut d = GzDecoder::new(&bytes[..]);
