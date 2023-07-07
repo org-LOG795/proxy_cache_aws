@@ -28,8 +28,21 @@ fn create_addr() -> SocketAddr {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), opentelemetry::trace::TraceError> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>  {
     let secret_test = Config {secret: "olo".to_string()};
+
+  // Create and install Jaeger pipeline
+    let tracer  = opentelemetry_jaeger::new_agent_pipeline()
+    .with_endpoint("localhost:6831") // set your agent endpoint here
+    .with_service_name("my-service")
+    .install_batch(opentelemetry::runtime::Tokio)?;
+
+    //global::set_tracer_provider(tracer_provider);
+
+tracer.in_span("compression", |_| {
+    facades::compression::compress(vec![1,2,3,4,5], &tracer);
+});
+
     // build our application with a route
     let app = Router::new()
         .route("/", get(handler))
@@ -47,15 +60,8 @@ async fn main() -> Result<(), opentelemetry::trace::TraceError> {
         .await
         .unwrap();
 
-    global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
-    let tracer = opentelemetry_jaeger::new_agent_pipeline().install_simple()?;
-    
-    tracer.in_span("doing_work", |_| {
-        facades::compression::compress(vec![1,2,3,4,5]);
-    });
-
+ 
     global::shutdown_tracer_provider(); // export remaining spans
-
     Ok(())
 
 }
