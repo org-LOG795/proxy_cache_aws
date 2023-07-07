@@ -11,7 +11,7 @@ use axum::{
 use middlewares::tracing::tracing_fn;
 //use tracing::{info, Level};
 use std::{env, net::SocketAddr};
-use opentelemetry::{global::{self}, trace::Tracer};
+use opentelemetry::{global::{self}};
 
 
 
@@ -39,10 +39,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
 
     //global::set_tracer_provider(tracer_provider);
 
-tracer.in_span("compression", |_| {
-    facades::compression::compress(vec![1,2,3,4,5], &tracer);
-});
-
+    tokio::spawn(async move {
+        facades::compression::compress(vec![1,2,3,4,5], &tracer).await;
+    });
     // build our application with a route
     let app = Router::new()
         .route("/", get(handler))
