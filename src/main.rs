@@ -1,5 +1,7 @@
 pub mod middlewares;
 pub mod facades;
+mod s3;
+// use s3::S3Facade;
 
 use axum::{
     response::Html, 
@@ -27,6 +29,7 @@ fn create_addr() -> SocketAddr {
 #[tokio::main]
 async fn main() {
     let secret_test = Config {secret: "olo".to_string()};
+    //let s3_facade = S3Facade::new();
 
     // build our application with a route
     let app = Router::new()
