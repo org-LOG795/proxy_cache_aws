@@ -9,7 +9,10 @@ use axum::{
     extract::State,
 };
 use middlewares::tracing::tracing_fn;
+//use tracing::{info, Level};
 use std::{env, net::SocketAddr};
+use opentelemetry::{global::{self}, trace::Tracer};
+
 
 
 #[derive(Clone)]
@@ -25,9 +28,8 @@ fn create_addr() -> SocketAddr {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), opentelemetry::trace::TraceError> {
     let secret_test = Config {secret: "olo".to_string()};
-
     // build our application with a route
     let app = Router::new()
         .route("/", get(handler))
@@ -44,7 +46,21 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
+
+    global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
+    let tracer = opentelemetry_jaeger::new_agent_pipeline().install_simple()?;
+    
+    tracer.in_span("doing_work", |_| {
+        facades::compression::compress(vec![1,2,3,4,5]);
+    });
+
+    global::shutdown_tracer_provider(); // export remaining spans
+
+    Ok(())
+
 }
+
+
 
 async fn handler() -> Html<&'static str> {
     Html("<h1>Hello, World!</h1>")
