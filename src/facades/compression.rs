@@ -31,7 +31,8 @@ mod compression_test {
 
     #[test]
     fn compress_valid_file() {
-        let contents = fs::read("T:\\Projects\\proxy_cache_aws\\test_files\\poem.txt").expect("NO FILE FOUND");
+        let contents = fs::read("C:\\Users\\carl-\\Documents\\GTI795\\proxy_cache_aws\\test_files\\poem.txt").expect("NO FILE FOUND");
+        
         let compressed = compress(contents.clone());
         let decompressed = decompress(compressed.clone());
         assert!(compressed.len() < contents.len());
