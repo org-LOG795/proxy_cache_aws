@@ -1,43 +1,20 @@
-mod middlewares;
-mod facades;
+pub mod middlewares;
+pub mod facades;
 
 use axum::{
-    body::Body,
-    http::Request,
     response::Html, 
     routing::get,
     Router,
     middleware,
     extract::State,
 };
-use opentelemetry::{
-    global::shutdown_tracer_provider,
-    sdk::Resource,
-    trace::TraceError,
-    global, 
-    sdk::trace as sdktrace,
-    trace::Tracer,
-};
-use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_http::HeaderExtractor;
-
-use std::{env, net::SocketAddr,error::Error};
-use middlewares::tracing::tracing_middleware;
+use middlewares::tracing::tracing_fn;
+use std::{env, net::SocketAddr};
 
 
 #[derive(Clone)]
-struct Config {
-    secret: String,
-}
-
-fn init_tracer() -> Result<sdktrace::Tracer, TraceError> {
-    opentelemetry_otlp::new_pipeline()
-        .tracing()
-        .with_exporter(opentelemetry_otlp::new_exporter().tonic().with_env())
-        .with_trace_config(
-            sdktrace::config().with_resource(Resource::default()),
-        )
-        .install_batch(opentelemetry::runtime::Tokio)
+pub struct Config {
+    pub secret: String,
 }
 
 fn create_addr() -> SocketAddr {
@@ -46,16 +23,16 @@ fn create_addr() -> SocketAddr {
     let addr_str = format!("{}:{}", host, port);
     addr_str.parse().unwrap_or_else(|_| panic!("{} is not a valid addr", addr_str))
 }
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
-    let _ = init_tracer()?;
+async fn main() {
     let secret_test = Config {secret: "olo".to_string()};
-   
+
     // build our application with a route
     let app = Router::new()
         .route("/", get(handler))
         .route("/secret", get(say_secret))
-        .layer(middleware::from_fn(tracing_middleware))
+        .layer(middleware::from_fn(tracing_fn))
         .with_state(secret_test);
 
     //Create app url
@@ -67,20 +44,31 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         .serve(app.into_make_service())
         .await
         .unwrap();
-
-    shutdown_tracer_provider();
-    Ok(())
 }
 
-
-async fn handler(req: Request<Body>) -> Html<&'static str> {
-    //let parent_cx = global::get_text_map_propagator(|propagator| {
-       // propagator.extract(&HeaderExtractor(req.headers()))
-    //});
-    //tracer.start_with_context("context_name", &parent_cx);
+async fn handler() -> Html<&'static str> {
     Html("<h1>Hello, World!</h1>")
 }
 
 async fn say_secret(State(config) : State<Config>) -> String {
     return config.secret;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn create_valid_addr() {
+        env::set_var("APP_HOST", "127.0.0.1");
+        env::set_var("APP_PORT", "5000");
+        assert_eq!(create_addr().to_string(), "127.0.0.1:5000".to_string());
+    }
+    #[test]
+    fn create_invalid_addr() {
+        env::set_var("APP_HOST", "asd2.111.222.333");
+        env::set_var("APP_PORT", "5000");
+        assert!(std::panic::catch_unwind(||create_addr()).is_err())
+    }
 }
