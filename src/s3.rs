@@ -15,6 +15,28 @@ impl S3Facade {
         S3Facade { client }
     }
 
+    // Upload file to specific bucket
+    pub async fn upload_file(       
+        &self,
+        bucket_name: &str,
+        file_path: &str,
+        file_name: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        let mut file = File::open(file_path)?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer)?;
+
+        let put_object_req = PutObjectRequest {
+            bucket: bucket_name.to_owned(),
+            key: file_name.to_owned(),
+            body: Some(buffer.into()),
+            ..Default::default()
+        };
+        self.client.put_object(put_object_req).await?;
+
+        Ok(())
+    }
+    
     // list S3 buckets
     pub async fn list_buckets(&self) -> Result<Vec<String>, Box<dyn Error>> {
         let response: ListBucketsOutput = self.client.list_buckets().await?;
@@ -48,28 +70,7 @@ impl S3Facade {
     
         Ok(())
     }
-
-    // Upload file to specific bucket
-    pub async fn upload_file(       
-        &self,
-        bucket_name: &str,
-        file_path: &str,
-        file_name: &str,
-    ) -> Result<(), Box<dyn Error>> {
-        let mut file = File::open(file_path)?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
-
-        let put_object_req = PutObjectRequest {
-            bucket: bucket_name.to_owned(),
-            key: file_name.to_owned(),
-            body: Some(buffer.into()),
-            ..Default::default()
-        };
-        self.client.put_object(put_object_req).await?;
-
-        Ok(())
-    }
+    
 }
 
 #[cfg(test)]
