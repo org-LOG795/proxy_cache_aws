@@ -49,7 +49,7 @@ impl S3Facade {
         Ok(())
     }
 
-    // Upload file to an existing S3 bucket
+    // Upload file to specific bucket
     pub async fn upload_file(       
         &self,
         bucket_name: &str,
@@ -104,7 +104,7 @@ mod tests {
             println!("{}", bucket);
         }
         
-        // Verify that the new bucket is in the list
+        // Check if the new bucket is in the list
         assert!(buckets.contains(&bucket_name));
 
         // Cleanup 
@@ -129,4 +129,46 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[tokio::test]
+    async fn test_upload_file() {
+        let s3_facade = S3Facade::new();
+        let id = Uuid::new_v4();
+        let bucket_name = format!("test-bucket-{}", id);
+
+        // Create a new bucket for the test
+        let create_result = s3_facade.create_bucket(&bucket_name).await;
+        assert!(create_result.is_ok());
+
+        // Create temp file
+        let mut temp_file = NamedTempFile::new().unwrap();
+        write!(temp_file, "This is a test file").unwrap();
+        let file_name = "file.txt";
+        let file_path = temp_file.path().to_str().unwrap();
+
+        // Upload the file
+        let upload_result = s3_facade.upload_file(&bucket_name, file_path, file_name).await;
+        if let Err(e) = upload_result {
+            println!("Error: {:?}", e); 
+            panic!();
+        }
+        
+        assert!(upload_result.is_ok());
+
+        // Cleanup 
+        let delete_object_req = rusoto_s3::DeleteObjectRequest {
+            bucket: bucket_name.clone(),
+            key: file_name.to_owned(),
+            ..Default::default()
+        };
+        let _ = s3_facade.client.delete_object(delete_object_req).await.unwrap();
+
+        let delete_result = s3_facade.delete_bucket(&bucket_name).await;
+        if let Err(e) = delete_result {
+            println!("Error: {:?}", e); 
+            panic!();
+        }
+
+        assert!(delete_result.is_ok());
+        }
+    
 }
