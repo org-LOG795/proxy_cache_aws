@@ -11,8 +11,7 @@ pub struct S3Facade {
 
 // Minimum part size for S3 is 5MB
 // Maximmim nuber of parts is 10000
-// Current part size allows for 5 * 10000 = 50GB size
-const PART_SIZE: usize = 5_242_880;
+// Current part size allows for 50 * 10000 = 50GB size
 
 // Maximum attempts for file upload
 const MAX_UPLOAD_ATTEMPTS: u32 = 5;
@@ -102,6 +101,15 @@ impl S3Facade {
                     Err(e) => {
                         attempts += 1;
                         if attempts >= MAX_UPLOAD_ATTEMPTS {
+                            // Abort upload
+                            let abort_req = rusoto_s3::AbortMultipartUploadRequest {
+                                bucket: bucket_name.to_owned(),
+                                key: file_name.to_owned(),
+                                upload_id: upload_id.clone(),
+                                ..Default::default()
+                            };
+                            self.client.abort_multipart_upload(abort_req).await?;
+                            println!("Upload of file aborted: {}", file_name);
                             return Err(Box::new(e));
                         } else {
                             // Exponential backoff: Wait for 2^(attempts - 1) seconds
@@ -125,8 +133,26 @@ impl S3Facade {
         let complete_output = self.client.complete_multipart_upload(complete_req).await?;
         let file_etag = complete_output.e_tag.ok_or("Missing file ETag")?;
 
-        println!("File ETag: {}", file_etag);
-        println!("File Key: {}", file_name);
+        println!("Uploaded file ETag: {}", file_etag);
+        println!("Uploaded file Key: {}", file_name);
+
+        Ok(())
+    }
+
+    // Abort multipart upload
+    pub async fn abort_multipart_upload(
+        &self,
+        bucket_name: &str,
+        key: &str,
+        upload_id: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        let abort_req = rusoto_s3::AbortMultipartUploadRequest {
+            bucket: bucket_name.to_owned(),
+            key: key.to_owned(),
+            upload_id: upload_id.to_owned(),
+            ..Default::default()
+        };
+        self.client.abort_multipart_upload(abort_req).await?;
 
         Ok(())
     }
@@ -170,15 +196,18 @@ impl S3Facade {
 mod tests {
     use super::*;
     use rusoto_core;
+    use rusoto_s3::{S3};
     use std::io::Write;
     use tempfile::NamedTempFile;
-    use tokio::time::{sleep, Duration};
     use uuid::Uuid;
 
     // Minimum part size for S3 is 5MB
     // Maximmim nuber of parts is 10000
-    // Current part size allows for 5 * 10000 = 50GB size
-    const PART_SIZE: usize = 5_242_880;
+    // Current part size allows for 50 * 10000 = 50GB size
+    const PART_SIZE: usize = 5_242_8800;
+    const TEST_FILE_NAME: &str = "";
+    const TEST_FILE_PATH: &str = "";
+
 
     #[tokio::test]
     async fn test_list_buckets() {
@@ -289,8 +318,8 @@ mod tests {
         assert!(create_result.is_ok(), "Bucket creation failed");
 
         // File path
-        let file_name = "";
-        let file_path = "";
+        let file_name = TEST_FILE_NAME;
+        let file_path = TEST_FILE_PATH;
 
         // Upload file
         let upload_result = s3_facade
@@ -337,5 +366,58 @@ mod tests {
             delete_bucket_result.is_ok(),
             "Bucket deletion assertion failed!"
         );
+    }
+    #[tokio::test]
+    async fn test_abort_multipart_upload() {
+        let s3_facade = S3Facade::new();
+        let id = Uuid::new_v4();
+        let bucket_name = format!("test-bucket-{}", id);
+
+        // Create a new bucket for the test
+        let create_result = s3_facade.create_bucket(&bucket_name).await;
+        assert!(create_result.is_ok());
+
+        // File path
+        let file_name = "file.txt";
+
+        // Start multipart upload
+        let create_req = rusoto_s3::CreateMultipartUploadRequest {
+            bucket: bucket_name.clone(),
+            key: file_name.to_owned(),
+            ..Default::default()
+        };
+        let upload_output = s3_facade
+            .client
+            .create_multipart_upload(create_req)
+            .await
+            .unwrap();
+        let upload_id = upload_output.upload_id.unwrap();
+
+        // Force an error by using an invalid upload_id
+        let invalid_upload_id = "invalid_id";
+        let part_req = rusoto_s3::UploadPartRequest {
+            bucket: bucket_name.clone(),
+            key: file_name.to_owned(),
+            upload_id: invalid_upload_id.to_string(),
+            part_number: 1,
+            body: None, // No actual part
+            ..Default::default()
+        };
+
+        let upload_result = s3_facade.client.upload_part(part_req).await;
+
+        // Assert that the upload failed
+        assert!(upload_result.is_err());
+
+        // Abort
+        let abort_result = s3_facade
+            .abort_multipart_upload(&bucket_name, file_name, &upload_id)
+            .await;
+        assert!(abort_result.is_ok());
+
+        // Cleanup
+        let delete_result = s3_facade.delete_bucket(&bucket_name).await;
+
+        assert!(delete_result.is_ok());
     }
 }
