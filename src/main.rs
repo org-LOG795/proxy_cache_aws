@@ -8,11 +8,10 @@ use axum::{
     middleware,
     extract::State,
 };
+use facades::compression::compress;
 use middlewares::tracing::tracing_fn;
-//use tracing::{info, Level};
 use std::{env, net::SocketAddr};
-use opentelemetry::{global::{self}};
-
+use crate::middlewares::tracing;
 
 
 #[derive(Clone)]
@@ -28,20 +27,10 @@ fn create_addr() -> SocketAddr {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>>  {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing::init_tracing_with_jaeger()?;
     let secret_test = Config {secret: "olo".to_string()};
 
-  // Create and install Jaeger pipeline
-    let tracer  = opentelemetry_jaeger::new_agent_pipeline()
-    .with_endpoint("localhost:6831") // set your agent endpoint here
-    .with_service_name("my-service")
-    .install_batch(opentelemetry::runtime::Tokio)?;
-
-    //global::set_tracer_provider(tracer_provider);
-
-    tokio::spawn(async move {
-        facades::compression::compress(vec![1,2,3,4,5], &tracer).await;
-    });
     // build our application with a route
     let app = Router::new()
         .route("/", get(handler))
@@ -59,15 +48,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
         .await
         .unwrap();
 
- 
-    global::shutdown_tracer_provider(); // export remaining spans
-    Ok(())
-
+Ok(())
 }
 
-
-
 async fn handler() -> Html<&'static str> {
+    let data = b"Hello, World!".to_vec();
+    compress(data).await;
     Html("<h1>Hello, World!</h1>")
 }
 

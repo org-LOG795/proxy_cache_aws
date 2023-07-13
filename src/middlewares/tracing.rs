@@ -3,41 +3,61 @@ use axum::{
     http::Request,
     middleware::Next
 };
+use tracing::info;
 use std::time::Instant;
-use opentelemetry::{global, KeyValue, trace::{Span, Tracer}};
-use std::convert::Infallible;
+use opentelemetry::global;
+use tracing_subscriber::{
+    fmt, layer::SubscriberExt, util::SubscriberInitExt,
+};
 
-pub async fn tracing_fn<B>(request: Request<B>, next: Next<B>) -> Result<Response, Infallible> {
+pub async fn tracing_fn<B>(request: Request<B>, next: Next<B>) -> Response {
     //Extract necessary information from the request
     let method = request.method().to_string();
     let url = request.uri().to_string();
-
-    // Start a new Span for this request
-    let tracer = global::tracer("my-component-test");
-    let mut span = tracer.start(format!("{} {}", method, url));
-
-    //Add key-value pairs to the span
-    span.set_attribute(KeyValue::new("http.method", method.clone()));
-    span.set_attribute(KeyValue::new("http.url", url.clone()));
-
+    let headers = format!("{:?}", request.headers());
+    
     //Start the timer
     let start = Instant::now();
     
     //Execute the next middleware/request
     let response = next.run(request).await;
-
+    
+    //Extract necessary information from the response
+    let res_status = response.status().to_string();
+    
     //The request time (in ms)
     let request_time = start.elapsed().as_millis().to_string();
+    
+    //Log tracing information
+    info!(
+        method = %method,
+        url = %url,
+        headers = %headers,
+        res_status = %res_status,
+        request_time = %request_time,
+        "Request processed"
+    );
+    
+    response
+}
 
-    //Add more attributes to the span
-    span.set_attribute(KeyValue::new("http.status_code", response.status().to_string()));
-    span.set_attribute(KeyValue::new("http.request_time_ms", request_time.clone()));
+pub fn init_tracing_with_jaeger() -> Result<(), Box<dyn std::error::Error>> {
+    global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
+    // Sets up the machinery needed to export data to Jaeger
+    let tracer = opentelemetry_jaeger::new_pipeline()
+        .with_service_name("Proxy_cache_aws")
+        .install_simple()?;
 
-   //Print tracing information
-   println!("{} {} => {} ({}ms)", method, url, response.status().to_string(), request_time);
+    // Create a tracing layer with the configured tracer
+    let opentelemetry = tracing_opentelemetry::layer().with_tracer(tracer);
 
-   // End the Span when the request is done
-   span.end();
+    // The SubscriberExt and SubscriberInitExt traits are needed to extend the
+    // Registry to accept `opentelemetry (the OpenTelemetryLayer type).
+    tracing_subscriber::registry()
+        .with(opentelemetry)
+        // Log to stdout in JSON format
+        .with(fmt::Layer::new().json())
+        .try_init()?;
 
-   Ok(response)
+    Ok(())
 }
