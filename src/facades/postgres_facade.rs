@@ -2,48 +2,43 @@ use std::env;
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use tokio_postgres::{Config, NoTls};
 
+pub fn create_config(host: &str, user: &str, pass: &str, db: &str) -> Config {
+    let mut configs = Config::new();
+
+    configs.host(host);
+    configs.user(user);
+    configs.password(pass);
+    configs.dbname(db);
+
+    configs
+}
 pub fn create_config_from_env() -> Result<Config, String> {
     match (env::var("POSTGRES_HOST"),
            env::var("POSTGRES_USER"),
            env::var("POSTGRES_PASSWORD"),
            env::var("POSTGRES_DB")) 
     {
-        (Ok(host), Ok(user), Ok(password), Ok(db)) => {
-            let mut config = Config::new();
-            config.host(&host);
-            config.user(&user);
-            config.password(&password);
-            config.dbname(&db);
-            Ok(config)
-        },
+        (Ok(host), Ok(user), Ok(password), Ok(db)) 
+            => Ok(create_config(&host, &user, &password, &db)),
         _ => Err("Missing postgres env".to_string())
     }
 }
 
-pub fn create_pool(configs: Config) -> Result<Pool, String> {
+pub fn create_pool(configs: Config, pool_size: usize) -> Result<Pool, String> {
     let mgr_config = ManagerConfig{recycling_method: RecyclingMethod::Fast};
     let mgr = Manager::from_config(configs, NoTls, mgr_config);
-    let pool_result = Pool::builder(mgr).max_size(3).build();
-    match pool_result {
-        Ok(pool) => Ok(pool),
-        Err(err) => Err(err.to_string()),
-    }
-    
+    let pool_result = Pool::builder(mgr).max_size(pool_size).build();
+    pool_result.map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
 
-    fn setup_env() {
-        env::set_var("POSTGRES_HOST", "127.0.0.1");
-        env::set_var("POSTGRES_USER", "guest");
-        env::set_var("POSTGRES_PASSWORD", "guest");
-        env::set_var("POSTGRES_DB", "test");
-    }
-
+    fn get_test_config() -> Config { create_config("127.0.0.1", "guest", "guest", "test") }
+    
     #[test]
+    //a added to the test name to make sure this test is ran first
     fn err_if_no_env() {
         let config = create_config_from_env();
         assert!(config.is_err());
@@ -51,27 +46,26 @@ mod tests {
 
     #[test]
     fn create_connection_pool() {
-        setup_env();
-        let pg_config = create_config_from_env().unwrap();
-        let pool = create_pool(pg_config);
+        let pg_config = get_test_config();
+        let pool = create_pool(pg_config, 1);
         assert!(pool.is_ok());
     }
 
     #[tokio::test]
+    #[ignore = "tests need to be ran with local postgres db"]
     async fn create_client() {
-        setup_env();
-        let pg_config = create_config_from_env().unwrap();
-        let pool = create_pool(pg_config);
+        let pg_config = get_test_config();
+        let pool = create_pool(pg_config, 1);
         assert!(pool.is_ok());
         let client = pool.unwrap().get().await;
         assert!(client.is_ok())
     }
 
     #[tokio::test]
+    #[ignore = "tests need to be ran with local postgres db"]
     async fn select_statement() {
-        setup_env();
-        let pg_config = create_config_from_env().unwrap();
-        let pool = create_pool(pg_config);
+        let pg_config = get_test_config();
+        let pool = create_pool(pg_config, 1);
         assert!(pool.is_ok());
         let client = pool.unwrap().get().await.unwrap();
 
