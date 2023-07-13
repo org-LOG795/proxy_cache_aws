@@ -6,7 +6,7 @@ use axum::{
     routing::get,
     Router,
     middleware,
-    extract::State,
+    extract::State, Json,
 };
 use deadpool_postgres::{Manager, Pool};
 use middlewares::tracing::tracing_fn;
@@ -69,7 +69,7 @@ struct TestRecord {
     column1: i32,
 }
 
-async fn postgres_test_handler(State(pool_manager) : State<Pool>) -> String{
+async fn postgres_test_handler(State(pool_manager) : State<Pool>) -> Json<Vec<TestRecord>>{
     let client = pool_manager.get().await.unwrap();
 
     let statement = client.prepare_cached("SELECT * FROM public.test_table").await.unwrap();
@@ -96,9 +96,7 @@ async fn postgres_test_handler(State(pool_manager) : State<Pool>) -> String{
         records.push(record)
     }
 
-    let json_response = json!(records);
-
-    return json_response.to_string();
+    Json(records)
 }
 
 #[cfg(test)]
