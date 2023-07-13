@@ -8,4 +8,6 @@ edition = "2021"
 #MAKE SURE TO LOOK AT LICENSE (MIT prefered)
 [dependencies]
 axum = "0.6.18"
+deadpool-postgres = "0.10.5"
 tokio = { version = "1.0", features = ["full"] }
+tokio-postgres = "0.7.8"
