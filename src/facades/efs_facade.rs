@@ -42,6 +42,7 @@ impl<'a> EfsFacade<'a> {
 
     pub async fn read(&mut self, file_name: &String) -> Result<(), u8> {
         
+        // Need to determine the file naming convention
         let parts: Vec<&str> = file_name.split('_').collect();
 
         if let Some(offset_range) = parts.get(1) {
@@ -52,7 +53,6 @@ impl<'a> EfsFacade<'a> {
                 
                 if let Ok(start_offset) = start.parse::<u64>() {
                     if let Ok(end_offset) = end.parse::<u64>() {
-                        
                         
                         let mut options = OpenOptions::new();
                         let mut file = options.read(true).open(file_name).await.unwrap();
@@ -71,6 +71,8 @@ impl<'a> EfsFacade<'a> {
                 }
             }
         }
+
+        Err("Error occured whiel reading bytes".into())
         
     }
 }
