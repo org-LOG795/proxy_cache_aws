@@ -1,6 +1,7 @@
 use std::path::Path;
 use tokio::fs;
 use std::io;
+use std::ops::Range<u64>
 
 pub struct EfsFacade {
 }
@@ -11,7 +12,7 @@ impl<'a> EfsFacade<'a> {
 
     }
 
-    pub async fn write(&self, bytes: &[u8], archive_name: String) -> Result<(), String> {
+    pub async fn write(&self, bytes: &[u8], archive_name: String) -> Result<(), Range<u64>> {
 
         file_path = ""
 
