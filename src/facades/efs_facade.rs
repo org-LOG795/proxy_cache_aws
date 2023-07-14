@@ -40,7 +40,8 @@ impl<'a> EfsFacade<'a> {
         return offset_range
     }
 
-    pub async fn read(&mut self, file_name: &String) -> Result<(), u8> {
+    // not sure about this
+    pub async fn read(&mut self, file_name: &String) -> Result<(), Vec<u8>> {
         
         // Need to determine the file naming convention
         let parts: Vec<&str> = file_name.split('_').collect();
