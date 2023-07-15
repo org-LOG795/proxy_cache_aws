@@ -17,11 +17,9 @@ pub struct Config {
     pub secret: String,
 }
 
-fn create_addr() -> SocketAddr {
-    let host = env::var("APP_HOST").unwrap_or("0.0.0.0".to_string());
-    let port = env::var("APP_PORT").unwrap_or("5000".to_string());
-    let addr_str = format!("{}:{}", host, port);
-    addr_str.parse().unwrap_or_else(|_| panic!("{} is not a valid addr", addr_str))
+fn create_addr(host: &str, port: &str) -> Result<SocketAddr, String> {
+    let format = format!("{}:{}", host, port);
+    format.parse::<SocketAddr>().map_err(|_| format!("{} is not a valid app address", format))
 }
 
 #[tokio::main]
@@ -35,15 +33,22 @@ async fn main() {
         .layer(middleware::from_fn(tracing_fn))
         .with_state(secret_test);
 
+    let app_host = env::var("APP_HOST").unwrap_or("0.0.0.0".to_string());
+    let app_port = env::var("APP_PORT").unwrap_or("5000".to_string());
     //Create app url
-    let addr = create_addr();
+    let addr = create_addr(&app_host, &app_port);
 
-    // run it
-    println!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    match addr {
+        Ok(valid_addr) => {
+            // run it
+            println!("listening on {}", valid_addr);
+            axum::Server::bind(&valid_addr)
+                .serve(app.into_make_service())
+                .await
+                .unwrap();
+        }
+        Err(err) => println!("ABORTING => {}", err.to_string())
+    }
 }
 
 async fn handler() -> Html<&'static str> {
@@ -57,18 +62,15 @@ async fn say_secret(State(config) : State<Config>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
 
     #[test]
     fn create_valid_addr() {
-        env::set_var("APP_HOST", "127.0.0.1");
-        env::set_var("APP_PORT", "5000");
-        assert_eq!(create_addr().to_string(), "127.0.0.1:5000".to_string());
+        let addr = create_addr("127.0.0.1", "5000");
+        assert!(addr.is_ok())
     }
     #[test]
     fn create_invalid_addr() {
-        env::set_var("APP_HOST", "asd2.111.222.333");
-        env::set_var("APP_PORT", "5000");
-        assert!(std::panic::catch_unwind(||create_addr()).is_err())
+        let addr = create_addr("123.456.789", "ab99");
+        assert!(addr.is_err())
     }
 }
