@@ -28,7 +28,6 @@ fn create_addr() -> SocketAddr {
 #[tokio::main]
 async fn main() {
     let secret_test = Config {secret: "olo".to_string()};
-    //let s3_facade = S3Facade::new();
 
     // build our application with a route
     let app = Router::new()

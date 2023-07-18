@@ -1,11 +1,11 @@
+use dotenv::dotenv;
+use log::info;
 use rusoto_core::Region;
 use rusoto_s3::{ListBucketsOutput, PutObjectRequest, S3Client, S3};
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use tokio::time::{sleep, Duration};
-use dotenv::dotenv;  // Correct import
-
 
 pub struct S3Facade {
     client: S3Client,
@@ -15,7 +15,7 @@ pub struct S3Facade {
 // Maximmim nuber of parts is 10000
 // Current part size allows for 50 * 10000 = 50GB size
 
-// Maximum attempts for file upload
+// Maximum attempts for file and multipart uploads
 const MAX_UPLOAD_ATTEMPTS: u32 = 5;
 
 impl S3Facade {
@@ -94,7 +94,7 @@ impl S3Facade {
                             e_tag: part_output.e_tag.clone(),
                             part_number: Some(part_number),
                         });
-                        println!(
+                        info!(
                             "Uploaded part {} with ETag {}",
                             part_number,
                             part_output.e_tag.clone().unwrap_or_default()
@@ -137,8 +137,8 @@ impl S3Facade {
         let complete_output = self.client.complete_multipart_upload(complete_req).await?;
         let file_etag = complete_output.e_tag.ok_or("Missing file ETag")?;
 
-        println!("Uploaded file ETag: {}", file_etag);
-        println!("Uploaded file Key: {}", file_name);
+        info!("Uploaded file ETag: {}", file_etag);
+        info!("Uploaded file Key: {}", file_name);
 
         Ok(())
     }
@@ -209,7 +209,6 @@ mod tests {
     // Current part size allows for 50 * 10000 = 50GB size
     const PART_SIZE: usize = 5_242_8800;
 
-
     #[tokio::test]
     async fn test_list_buckets() {
         let s3_facade = S3Facade::new();
@@ -223,7 +222,7 @@ mod tests {
         // List buckets
         let list_result = s3_facade.list_buckets().await;
         if let Err(e) = list_result {
-            println!("Error: {:?}", e);
+            info!("Error: {:?}", e);
             panic!();
         }
 
@@ -231,7 +230,7 @@ mod tests {
         let buckets = list_result.unwrap();
         println!("Bucket names:");
         for bucket in &buckets {
-            println!("{}", bucket);
+            info!("{}", bucket);
         }
 
         // Check if the new bucket is in the list
@@ -281,7 +280,7 @@ mod tests {
             .upload_file(&bucket_name, file_path, file_name)
             .await;
         if let Err(e) = upload_result {
-            println!("Error: {:?}", e);
+            info!("Error: {:?}", e);
             panic!();
         }
 
@@ -301,7 +300,7 @@ mod tests {
 
         let delete_result = s3_facade.delete_bucket(&bucket_name).await;
         if let Err(e) = delete_result {
-            println!("Error: {:?}", e);
+            info!("Error: {:?}", e);
             panic!();
         }
 
@@ -335,15 +334,15 @@ mod tests {
             {
                 match rusoto_err {
                     rusoto_core::RusotoError::HttpDispatch(dispatch_error) => {
-                        println!("This was an HttpDispatch error: {:?}", dispatch_error);
+                        info!("This was an HttpDispatch error: {:?}", dispatch_error);
                     }
                     rusoto_core::RusotoError::Service(service_error) => {
-                        println!("This was a Service error: {:?}", service_error);
+                        info!("This was a Service error: {:?}", service_error);
                     }
                     rusoto_core::RusotoError::Unknown(unknown_error) => {
-                        println!("This was an Unknown error: {:?}", unknown_error);
+                        info!("This was an Unknown error: {:?}", unknown_error);
                     }
-                    //Other error handling here
+                    //Other error handling hereA
                     _ => {}
                 }
             }
@@ -362,7 +361,7 @@ mod tests {
 
         let delete_bucket_result = s3_facade.delete_bucket(&bucket_name).await;
         if let Err(e) = delete_bucket_result {
-            println!("Error: {:?}", e);
+            info!("Error: {:?}", e);
             panic!("Bucket deletion failed");
         }
 
@@ -372,7 +371,6 @@ mod tests {
         );
     }
 
-    
     #[tokio::test]
     async fn test_abort_multipart_upload() {
         let s3_facade = S3Facade::new();
