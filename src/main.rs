@@ -14,6 +14,7 @@ use facades::postgres_facade::{create_config_from_env, create_pool};
 use std::{env, net::SocketAddr};
 use serde::{Serialize, Deserialize};
 use serde_json::json;
+use crate::middlewares::tracing;
 
 
 #[derive(Clone)]
@@ -27,7 +28,8 @@ fn create_addr(host: &str, port: &str) -> Result<SocketAddr, String> {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing::init_tracing_with_jaeger()?;
     let secret_test = Config {secret: "olo".to_string()};
 
     let postgres_config = create_config_from_env().expect("Unable to load");
@@ -58,6 +60,7 @@ async fn main() {
         }
         Err(err) => println!("ABORTING => {}", err.to_string())
     }
+Ok(())
 }
 
 async fn handler() -> Html<&'static str> {
