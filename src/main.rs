@@ -38,15 +38,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_host = env::var("APP_HOST").unwrap_or("0.0.0.0".to_string());
     let app_port = env::var("APP_PORT").unwrap_or("5000".to_string());
     //Create app url
-    let addr = create_addr();
-
-    // run it
-    println!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
-
     let addr = create_addr(&app_host, &app_port);
 
     match addr {
