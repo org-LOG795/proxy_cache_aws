@@ -8,7 +8,6 @@ use axum::{
     middleware,
     extract::State,
 };
-use facades::compression::compress;
 use middlewares::tracing::tracing_fn;
 use std::{env, net::SocketAddr};
 use crate::middlewares::tracing;
@@ -52,8 +51,6 @@ Ok(())
 }
 
 async fn handler() -> Html<&'static str> {
-    let data = b"Hello, World!".to_vec();
-    compress(data).await;
     Html("<h1>Hello, World!</h1>")
 }
 

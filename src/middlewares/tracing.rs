@@ -61,3 +61,15 @@ pub fn init_tracing_with_jaeger() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_init_tracing_with_jaeger() {
+        let result = init_tracing_with_jaeger();
+        assert!(result.is_ok());
+    }
+}
