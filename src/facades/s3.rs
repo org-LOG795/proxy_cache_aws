@@ -4,6 +4,8 @@ use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use tokio::time::{sleep, Duration};
+use dotenv::dotenv;  // Correct import
+
 
 pub struct S3Facade {
     client: S3Client,
@@ -18,11 +20,13 @@ const MAX_UPLOAD_ATTEMPTS: u32 = 5;
 
 impl S3Facade {
     pub fn new() -> Self {
+        // Load .env file
+        dotenv().ok();
+
         let region = Region::default();
         let client = S3Client::new(region);
         S3Facade { client }
     }
-
     // Upload file to specific bucket
     pub async fn upload_file(
         &self,
@@ -196,7 +200,6 @@ impl S3Facade {
 mod tests {
     use super::*;
     use rusoto_core;
-    use rusoto_s3::{S3};
     use std::io::Write;
     use tempfile::NamedTempFile;
     use uuid::Uuid;
@@ -205,8 +208,6 @@ mod tests {
     // Maximmim nuber of parts is 10000
     // Current part size allows for 50 * 10000 = 50GB size
     const PART_SIZE: usize = 5_242_8800;
-    const TEST_FILE_NAME: &str = "";
-    const TEST_FILE_PATH: &str = "";
 
 
     #[tokio::test]
@@ -317,13 +318,16 @@ mod tests {
         let create_result = s3_facade.create_bucket(&bucket_name).await;
         assert!(create_result.is_ok(), "Bucket creation failed");
 
-        // File path
-        let file_name = TEST_FILE_NAME;
-        let file_path = TEST_FILE_PATH;
+        // Generate a file for upload
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+        let file_data = vec![0; PART_SIZE + 10]; // Some data larger than one part
+        temp_file.write_all(&file_data).unwrap();
+        let file_path = temp_file.path().to_str().unwrap().to_owned();
+        let file_name = "multipart_upload.txt";
 
         // Upload file
         let upload_result = s3_facade
-            .upload_file_multipart(&bucket_name, file_path, file_name, PART_SIZE)
+            .upload_file_multipart(&bucket_name, &file_path, file_name, PART_SIZE)
             .await;
         if let Err(e) = upload_result {
             if let Some(rusoto_err) =
@@ -367,6 +371,8 @@ mod tests {
             "Bucket deletion assertion failed!"
         );
     }
+
+    
     #[tokio::test]
     async fn test_abort_multipart_upload() {
         let s3_facade = S3Facade::new();
