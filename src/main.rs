@@ -10,6 +10,7 @@ use axum::{
 };
 use middlewares::tracing::tracing_fn;
 use std::{env, net::SocketAddr};
+use crate::middlewares::tracing;
 
 
 #[derive(Clone)]
@@ -23,7 +24,8 @@ fn create_addr(host: &str, port: &str) -> Result<SocketAddr, String> {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing::init_tracing_with_jaeger()?;
     let secret_test = Config {secret: "olo".to_string()};
 
     // build our application with a route
@@ -49,6 +51,7 @@ async fn main() {
         }
         Err(err) => println!("ABORTING => {}", err.to_string())
     }
+Ok(())
 }
 
 async fn handler() -> Html<&'static str> {
