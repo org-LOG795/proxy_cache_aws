@@ -1,0 +1,7 @@
+FROM postgres:15.3-bullseye
+
+ENV POSTGRES_USER=guest
+ENV POSTGRES_PASSWORD=guest
+ENV POSTGRES_DB=test
+
+EXPOSE 5432
