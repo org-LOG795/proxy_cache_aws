@@ -113,7 +113,7 @@ impl S3Facade {
                                 ..Default::default()
                             };
                             self.client.abort_multipart_upload(abort_req).await?;
-                            println!("Upload of file aborted: {}", file_name);
+                            info!("Upload of file aborted: {}", file_name);
                             return Err(Box::new(e));
                         } else {
                             // Exponential backoff: Wait for 2^(attempts - 1) seconds
@@ -210,6 +210,7 @@ mod tests {
     const PART_SIZE: usize = 5_242_8800;
 
     #[tokio::test]
+    #[ignore = "tests need to be ran with AWS credentials defined in environment"]
     async fn test_list_buckets() {
         let s3_facade = S3Facade::new();
         let id = Uuid::new_v4();
@@ -242,6 +243,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "tests need to be ran with AWS credentials defined in environment"]
     async fn test_create_bucket() {
         let s3_facade = S3Facade::new();
         let id = Uuid::new_v4();
@@ -260,6 +262,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "tests need to be ran with AWS credentials defined in environment"]
     async fn test_upload_file() {
         let s3_facade = S3Facade::new();
         let id = Uuid::new_v4();
@@ -308,6 +311,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "tests need to be ran with AWS credentials defined in environment"]
     async fn test_upload_file_multipart() {
         let s3_facade = S3Facade::new();
         let id = Uuid::new_v4();
@@ -372,6 +376,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "tests need to be ran with AWS credentials defined in environment"]
     async fn test_abort_multipart_upload() {
         let s3_facade = S3Facade::new();
         let id = Uuid::new_v4();
