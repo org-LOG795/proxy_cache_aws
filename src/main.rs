@@ -1,5 +1,6 @@
 pub mod middlewares;
 pub mod facades;
+use facades::s3::S3Facade;
 
 use axum::{
     response::Html, 
