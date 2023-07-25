@@ -8,8 +8,8 @@ edition = "2021"
 #MAKE SURE TO LOOK AT LICENSE (MIT prefered)
 [dependencies]
 axum = "0.6.18"
-deadpool-postgres = "0.10.5"
 tokio = { version = "1.0", features = ["full"] }
+deadpool-postgres = "0.10.5"
 tokio-postgres = "0.7.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -19,3 +19,18 @@ tracing-opentelemetry = "0.17.2"
 opentelemetry-jaeger = "0.16.0"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter", "json"]}
 tracing = "0.1.37"
+rusoto_s3 = "0.48.0"
+rusoto_core = "0.48.0"
+tempfile = "3.6.0"
+rusoto_credential = "0.46.0"
+dotenv = "0.15.0"
+log = "0.4.19"
+chrono = "0.4.26"
+
+[dependencies.uuid]
+version = "1.4.0"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
