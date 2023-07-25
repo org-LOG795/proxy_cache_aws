@@ -50,7 +50,6 @@ impl EfsFacade {
             Ok(mut offset_file) => {
                 if offset_file.metadata().await.unwrap().len() != 0 {
                     // We assume if it's not 0, there's 8 bytes
-                    // let current_offset: u64 = file.seek(SeekFrom::Current(0)).await?;
                     let mut buffer = [0_u8; 8];
 
                     offset_file.read(&mut buffer).await?;
@@ -91,17 +90,51 @@ impl EfsFacade {
         Ok(())
     }
 
+    async fn read_file(file_path: String) -> Result<Vec<u8>, Box<dyn Error>> {
+        let mut options = OpenOptions::new();
+        options.read(true);
+        let mut buffer = Vec::new();
+
+        let path = Path::new(&file_path);
+
+        match options.open(file_path).await {
+            Ok(mut file) => {
+                file.read_to_end(&mut buffer);
+                println!("{}", buffer.len());
+            }
+
+            Err(e) => {
+                println!("Error opening file: {}", e);
+                return Err(Box::new(e));
+            }
+        }
+
+        Ok(buffer)
+    }
+
     async fn check_offset_range_in_file(
         offset_file_path: &str,
-        offset_range: u8,
+        offset_range: &Range<u64>,
     ) -> io::Result<bool> {
         let mut file = File::open(offset_file_path).await?;
+
+        let starting_offset = offset_range.start;
+        let ending_offset = offset_range.end;
 
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer).await?;
 
-        for byte in &buffer {
-            if *byte == offset_range {
+        let ranges = buffer
+            .chunks_exact(8) // Assuming each value is 8 bytes (u64 size)
+            .map(|chunk| {
+                u64::from_le_bytes([
+                    chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7],
+                ])
+            })
+            .collect::<Vec<u64>>();
+
+        for range in &ranges {
+            if *range >= starting_offset && *range <= ending_offset {
                 return Ok(true);
             }
         }
@@ -143,30 +176,26 @@ impl EfsFacade {
         Ok(offset_range)
     }
 
-    // pub async fn read(
-    //     &mut self,
-    //     offset_range: &RangeInclusive<u64>,
-    //     file_name: &str,
-    // ) -> Result<(), Vec<u8>> {
-    //     if let Some(start) = offset_range.start {
-    //         if let Some(end) = offset_range.end {
-    //             let mut options = OpenOptions::new();
-    //             let mut file = options.read(true).open(file_name).await?;
+    pub async fn read(&self, file_name: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+        let parts: Vec<&str> = file_name.splitn(2, '#').collect();
+        let archive_name = parts[0];
+        let offset_range = parts[1];
+        let bytes_file_path = format!("{}/{}", archive_name, offset_range);
 
-    //             file.seek(SeekFrom::Start(start)).await?;
+        let path = Path::new(&bytes_file_path);
+        let mut bytes = Vec::new();
 
-    //             let bytes_range = (end - start) as usize;
-    //             let mut bytes = vec![0u8; bytes_range];
-    //             file.read_exact(&mut bytes).await?;
+        if path.exists() {
+            bytes = Self::read_file(bytes_file_path).await?;
+        } else {
+            return Err(Box::new(io::Error::new(
+                io::ErrorKind::Other,
+                "Error: File does not exist in EFS",
+            )));
+        }
 
-    //             Ok(bytes);
-    //         } else {
-    //             Err("Error reading the end offset".into())
-    //         }
-    //     } else {
-    //         Err("Error reading the start of the offset".into())
-    //     }
-    // }
+        Ok(bytes)
+    }
 
     pub async fn get_directories_list(&self, directory_path: &str) -> io::Result<Vec<String>> {
         let mut directories = Vec::new();
@@ -195,9 +224,8 @@ impl EfsFacade {
 
 #[cfg(test)]
 mod efs_facade_test {
-    use std::{fs::File, io::Read};
-
     use super::*;
+    use std::{fs::File, io::Read};
 
     #[tokio::test]
     async fn test_write() {
@@ -253,31 +281,21 @@ mod efs_facade_test {
             }
         }
     }
+
+    #[tokio::test]
+    async fn test_read() {
+        // Prepare
+        let archive_name = "archive-test";
+        let data = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
+        let bytes = data.as_bytes();
+
+        let efs_facade = EfsFacade::new();
+        let offset1 = efs_facade.write(&bytes, archive_name).await;
+        let offset2 = efs_facade.write(&bytes, archive_name).await;
+
+        let file_name = "archive-test#0-574";
+
+        let result = efs_facade.read(file_name).await;
+        assert_eq!(bytes, result.unwrap());
+    }
 }
-
-// #[tokio::test]
-// async fn test_read() {
-//     // Prepare
-//     let temp_dir = tempfile::tempdir().expect("Failed to create a temporary directory");
-//     let file_name = temp_dir.path().join("test_file.txt");
-//     let data = "Hello, World!";
-//     let bytes = data.as_bytes();
-
-//     let efs_facade = EfsFacade::new();
-
-//     // Act
-//     let write_result = efs_facade.write(bytes, file_name.to_string()).await;
-//     assert!(write_result.is_ok(), "Failed to write bytes to the file");
-
-//     let offset_range = 0..data.len() as u64;
-//     let result = efs_facade
-//         .read(&offset_range, file_name.to_str().unwrap())
-//         .await;
-
-//     // Assert
-//     assert!(result.is_ok(), "Failed to read bytes from the file");
-
-//     let actual = result.unwrap();
-//     assert_eq!(actual, data);
-// }
-// }
