@@ -95,11 +95,9 @@ impl EfsFacade {
         options.read(true);
         let mut buffer = Vec::new();
 
-        let path = Path::new(&file_path);
-
         match options.open(file_path).await {
             Ok(mut file) => {
-                file.read_to_end(&mut buffer);
+                file.read_to_end(&mut buffer).await?;
                 println!("{}", buffer.len());
             }
 
@@ -228,6 +226,26 @@ mod efs_facade_test {
     use std::{fs::File, io::Read};
 
     #[tokio::test]
+    async fn test_read() {
+        // Prepare
+        let archive_name = "archive-test";
+        let data = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
+        let bytes = data.as_bytes();
+
+        let efs_facade = EfsFacade::new();
+        let offset1 = efs_facade.write(&bytes, archive_name).await;
+        let offset2 = efs_facade.write(&bytes, archive_name).await;
+
+        let file_name = "archive-test#0-574";
+
+        let result = efs_facade.read(file_name).await;
+        assert_eq!(bytes, result.unwrap());
+
+        let completed = efs_facade.delete(archive_name).await;
+        assert!(completed.is_ok());
+    }
+
+    #[tokio::test]
     async fn test_write() {
         // Prepare
         let file_name = "archive-test";
@@ -280,22 +298,5 @@ mod efs_facade_test {
                 panic!("Error occurred during the test: {:?}", err);
             }
         }
-    }
-
-    #[tokio::test]
-    async fn test_read() {
-        // Prepare
-        let archive_name = "archive-test";
-        let data = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
-        let bytes = data.as_bytes();
-
-        let efs_facade = EfsFacade::new();
-        let offset1 = efs_facade.write(&bytes, archive_name).await;
-        let offset2 = efs_facade.write(&bytes, archive_name).await;
-
-        let file_name = "archive-test#0-574";
-
-        let result = efs_facade.read(file_name).await;
-        assert_eq!(bytes, result.unwrap());
     }
 }
