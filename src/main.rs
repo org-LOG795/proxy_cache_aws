@@ -1,6 +1,13 @@
 pub mod middlewares;
+use deadpool_postgres::Pool;
+use middlewares::tracing::tracing_fn;
+
+pub mod handlers;
+use handlers::general::pong;
+use handlers::collections::{get as get_collection, save as save_collection};
+
 pub mod facades;
-use facades::s3::S3Facade;
+use facades::postgres_facade::{create_config_from_env, create_pool};
 
 use axum::{
     response::Html, 
@@ -9,9 +16,7 @@ use axum::{
     middleware,
     extract::State, Json,
 };
-use deadpool_postgres::{Manager, Pool};
-use middlewares::tracing::tracing_fn;
-use facades::postgres_facade::{create_config_from_env, create_pool};
+
 use std::{env, net::SocketAddr};
 use serde::{Serialize, Deserialize};
 use serde_json::json;
@@ -36,13 +41,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let postgres_config = create_config_from_env().expect("Unable to load");
     let postgres_pool = create_pool(postgres_config, 3).unwrap();
 
+    let client = postgres_pool.get().await.unwrap();
+
     // build our application with a route
     let app = Router::new()
-        .route("/", get(handler))
-        .route("/secret", get(say_secret))
-        .with_state(secret_test)
-        .route("/postgres", get(postgres_test_handler))
-        .with_state(postgres_pool)
+        .route("/ping", get(pong))
         .layer(middleware::from_fn(tracing_fn));
 
     let app_host = env::var("APP_HOST").unwrap_or("0.0.0.0".to_string());
@@ -64,49 +67,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 Ok(())
 }
 
-async fn handler() -> Html<&'static str> {
-    Html("<h1>Hello, World!</h1>")
-}
-
-async fn say_secret(State(config) : State<Config>) -> String {
-    return config.secret;
-}
-
-#[derive(Serialize, Deserialize)]
-struct TestRecord {
-    // Define the fields based on your table schema
-    column1: i32,
-}
-
-async fn postgres_test_handler(State(pool_manager) : State<Pool>) -> Json<Vec<TestRecord>>{
-    let client = pool_manager.get().await.unwrap();
-
-    let statement = client.prepare_cached("SELECT * FROM public.test_table").await.unwrap();
-
-    let rows = client.query(&statement, &[]).await.unwrap();
-
-    let mut records = Vec::new();
-
-    for row in rows.iter() {
-        let mut record = TestRecord {
-            column1: 0, // Initialize with default values
-            // ...
-        };
-
-        for (index, column) in row.columns().iter().enumerate() {
-            match column.name() {
-                "column1" => record.column1 = row.get(index),
-                // Set other fields based on their column names
-                // ...
-                _ => (),
-            }
-        }
-
-        records.push(record)
-    }
-
-    Json(records)
-}
 
 #[cfg(test)]
 mod tests {

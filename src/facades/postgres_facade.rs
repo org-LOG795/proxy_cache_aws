@@ -1,6 +1,8 @@
 use std::env;
-use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
+use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod, ClientWrapper, Object};
 use tokio_postgres::{Config, NoTls};
+use chrono::{Utc, Datelike};
+use tracing_subscriber::fmt::format;
 
 pub fn create_config(host: &str, user: &str, pass: &str, db: &str) -> Config {
     let mut configs = Config::new();
@@ -31,6 +33,38 @@ pub fn create_pool(configs: Config, pool_size: usize) -> Result<Pool, String> {
     pool_result.map_err(|e| e.to_string())
 }
 
+fn get_current_date() -> String {
+    let current_date = Utc::now();
+    format!("{:04}-{:02}-{:02}", current_date.year(), current_date.month(), current_date.day())
+}
+
+pub async fn get_offset(client: Object, len_bytes: usize) -> Result<(i64, i64), String>{
+    let current_date = get_current_date();
+    let table = "\"CacheOffsetTable\"".to_string();
+    let date = "\"date\"".to_string();
+    let offset = "\"offset\"".to_string();
+    
+    let query = format!(
+        "INSERT INTO public.{table} ({date}, {offset}) VALUES (DATE '{current_date}', {len_bytes})\n
+        ON CONFLICT ({date}) DO\n
+        UPDATE SET {offset} = {table}.{offset} + {len_bytes}\n
+        RETURNING {table}.{offset};\n", 
+        table = table, date = date, offset = offset, len_bytes = len_bytes);
+
+    match client.prepare_cached(&query).await {
+        Ok(statement) => {
+            client
+                .query_one(&statement, &[])
+                .await
+                .map(|row| {
+                    let offset: i64 = row.get("offset");
+                    (offset - len_bytes as i64, offset - 1)
+                })
+                .map_err(|err| err.to_string())
+        },
+        Err(err) => Err(err.to_string())
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -80,5 +114,19 @@ mod tests {
             }
         }
         println!("------------");
+    }
+
+    #[tokio::test]
+    #[ignore = "tests need to be ran with local postgres db"]
+    async fn get_offset_test() {
+        let pg_config = get_test_config();
+        let pool = create_pool(pg_config, 1);
+        assert!(pool.is_ok());
+        let client = pool.unwrap().get().await.unwrap();
+
+        match get_offset(client, 20).await {
+            Ok(offsets) => println!("({},{})", offsets.0, offsets.1),
+            Err(err) => println!("{}", err.to_string())
+        }
     }
 }
