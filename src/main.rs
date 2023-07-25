@@ -16,10 +16,12 @@ use axum::{
     middleware,
     extract::State, Json,
 };
-
+use deadpool_postgres::{Pool};
+use middlewares::tracing::tracing_fn;
+use facades::postgres_facade::{create_config_from_env, create_pool};
 use std::{env, net::SocketAddr};
 use serde::{Serialize, Deserialize};
-use serde_json::json;
+
 use crate::middlewares::tracing;
 
 
