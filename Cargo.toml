@@ -25,6 +25,8 @@ tempfile = "3.6.0"
 rusoto_credential = "0.46.0"
 dotenv = "0.15.0"
 log = "0.4.19"
+serial_test = "2.0.0"
+
 
 [dependencies.uuid]
 version = "1.4.0"
