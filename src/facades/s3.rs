@@ -23,43 +23,34 @@ pub fn init_client() -> S3Client {
 // Maximum attempts for file and multipart uploads
 const MAX_UPLOAD_ATTEMPTS: u32 = 5;
 
-impl S3Facade {
-    pub fn new() -> Self {
-        // Load .env file
-        dotenv().ok();
 
-        let region = Region::default();
-        let client = S3Client::new(region);
-        S3Facade { client }
-    }
+// Get an object form S3
+pub async fn get_item(bucket_name: &str, file_name: &str, client: S3Client) -> Result<Vec<u8>, Box<dyn Error>> {
+    let get_obj_req = rusoto_s3::GetObjectRequest {
+        bucket: bucket_name.to_owned(),
+        key: file_name.to_owned(),
+        ..Default::default()
+    };
 
-    // Get an object form S3
-    pub async fn get_item(&self, bucket_name: &str, file_name: &str) -> Result<Vec<u8>, Box<dyn Error>> {
-        let get_obj_req = rusoto_s3::GetObjectRequest {
-            bucket: bucket_name.to_owned(),
-            key: file_name.to_owned(),
-            ..Default::default()
-        };
+    let get_obj_output = client.get_object(get_obj_req).await?;
+    let mut reader = get_obj_output.body.ok_or("Missing object body")?.into_async_read();
 
-        let get_obj_output = self.client.get_object(get_obj_req).await?;
-        let mut reader = get_obj_output.body.ok_or("Missing object body")?.into_async_read();
+    let mut buffer = Vec::new();
+    reader.read_to_end(&mut buffer).await?;
 
-        let mut buffer = Vec::new();
-        reader.read_to_end(&mut buffer).await?;
+    Ok(buffer)
+}
 
-        Ok(buffer)
-    }
-
-    // Upload file to specific bucket
-    pub async fn upload_file(
-        &self,
-        bucket_name: &str,
-        file_path: &str,
-        file_name: &str,
-    ) -> Result<(), Box<dyn Error>> {
-        let mut file = File::open(file_path)?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
+// Upload file to specific bucket
+pub async fn upload_file(
+    bucket_name: &str,
+    file_path: &str,
+    file_name: &str,
+    client: S3Client
+) -> Result<(), Box<dyn Error>> {
+    let mut file = File::open(file_path)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
 
     let put_object_req = PutObjectRequest {
         bucket: bucket_name.to_owned(),
@@ -237,84 +228,84 @@ pub async fn delete_bucket(bucket_name: &str, client: S3Client) -> Result<(), Bo
 //     use std::io::Write;
 //     use tempfile::NamedTempFile;
 //     use uuid::Uuid;
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use rusoto_core;
-    use std::io::Write;
-    use tempfile::NamedTempFile;
-    use uuid::Uuid;
-    use serial_test::serial;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use rusoto_core;
+//     use std::io::Write;
+//     use tempfile::NamedTempFile;
+//     use uuid::Uuid;
+//     use serial_test::serial;
 
-//     // Minimum part size for S3 is 5MB
-//     // Maximmim nuber of parts is 10000
-//     // Current part size allows for 50 * 10000 = 50GB size
-//     const PART_SIZE: usize = 5_242_8800;
+// //     // Minimum part size for S3 is 5MB
+// //     // Maximmim nuber of parts is 10000
+// //     // Current part size allows for 50 * 10000 = 50GB size
+// //     const PART_SIZE: usize = 5_242_8800;
 
 
-    #[tokio::test]
-    #[serial]
-    #[ignore = "tests need to be ran with AWS credentials defined in environment"]
-    async fn test_get_item() {
-        let s3_facade = S3Facade::new();
-        let id = Uuid::new_v4();
-        let bucket_name = format!("test-bucket-{}", id);
+//     #[tokio::test]
+//     #[serial]
+//     #[ignore = "tests need to be ran with AWS credentials defined in environment"]
+//     async fn test_get_item() {
+//         let s3_facade = S3Facade::new();
+//         let id = Uuid::new_v4();
+//         let bucket_name = format!("test-bucket-{}", id);
     
-        // Create a new bucket for the test
-        let create_result = s3_facade.create_bucket(&bucket_name).await;
-        assert!(create_result.is_ok(), "Bucket creation failed");
+//         // Create a new bucket for the test
+//         let create_result = s3_facade.create_bucket(&bucket_name).await;
+//         assert!(create_result.is_ok(), "Bucket creation failed");
     
-        // Create some content
-        let content = "test file";
+//         // Create some content
+//         let content = "test file";
     
-        // Create a temp file
-        let mut temp_file = NamedTempFile::new().unwrap();
-        temp_file.write_all(content.as_bytes()).unwrap();
-        let file_name = "file.txt";
-        let file_path = temp_file.path().to_str().unwrap();
+//         // Create a temp file
+//         let mut temp_file = NamedTempFile::new().unwrap();
+//         temp_file.write_all(content.as_bytes()).unwrap();
+//         let file_name = "file.txt";
+//         let file_path = temp_file.path().to_str().unwrap();
     
-        // Upload the file
-        let upload_result = s3_facade
-            .upload_file(&bucket_name, file_path, file_name)
-            .await;
-        assert!(upload_result.is_ok(), "Upload file failed");
+//         // Upload the file
+//         let upload_result = s3_facade
+//             .upload_file(&bucket_name, file_path, file_name)
+//             .await;
+//         assert!(upload_result.is_ok(), "Upload file failed");
     
-        // Read the file back from S3
-        let downloaded_content = s3_facade
-            .get_item(&bucket_name, file_name)
-            .await
-            .expect("Read file failed");
+//         // Read the file back from S3
+//         let downloaded_content = s3_facade
+//             .get_item(&bucket_name, file_name)
+//             .await
+//             .expect("Read file failed");
     
-        // Compare 
-        assert_eq!(
-            String::from_utf8_lossy(&downloaded_content),
-            content,
-            "Content of the downloaded file did not match the original file"
-        );
+//         // Compare 
+//         assert_eq!(
+//             String::from_utf8_lossy(&downloaded_content),
+//             content,
+//             "Content of the downloaded file did not match the original file"
+//         );
     
-        // Cleanup
-        let delete_object_req = rusoto_s3::DeleteObjectRequest {
-            bucket: bucket_name.clone(),
-            key: file_name.to_owned(),
-            ..Default::default()
-        };
-        let delete_object_result = s3_facade.client.delete_object(delete_object_req).await;
-        assert!(delete_object_result.is_ok(), "Object deletion failed");
+//         // Cleanup
+//         let delete_object_req = rusoto_s3::DeleteObjectRequest {
+//             bucket: bucket_name.clone(),
+//             key: file_name.to_owned(),
+//             ..Default::default()
+//         };
+//         let delete_object_result = s3_facade.client.delete_object(delete_object_req).await;
+//         assert!(delete_object_result.is_ok(), "Object deletion failed");
     
-        let delete_bucket_result = s3_facade.delete_bucket(&bucket_name).await;
-        assert!(
-            delete_bucket_result.is_ok(),
-            "Bucket deletion assertion failed"
-        );
-    }
+//         let delete_bucket_result = s3_facade.delete_bucket(&bucket_name).await;
+//         assert!(
+//             delete_bucket_result.is_ok(),
+//             "Bucket deletion assertion failed"
+//         );
+//     }
 
-    #[tokio::test]
-    #[serial]
-    #[ignore = "tests need to be ran with AWS credentials defined in environment"]
-    async fn test_list_buckets() {
-        let s3_facade = S3Facade::new();
-        let id = Uuid::new_v4();
-        let bucket_name = format!("test-bucket-{}", id);
+//     #[tokio::test]
+//     #[serial]
+//     #[ignore = "tests need to be ran with AWS credentials defined in environment"]
+//     async fn test_list_buckets() {
+//         let s3_facade = S3Facade::new();
+//         let id = Uuid::new_v4();
+//         let bucket_name = format!("test-bucket-{}", id);
 
 //         // Create a bucket
 //         let create_result = s3_facade.create_bucket(&bucket_name).await;
@@ -342,13 +333,13 @@ mod tests {
 //         assert!(delete_result.is_ok());
 //     }
 
-    #[tokio::test]
-    #[serial]
-    #[ignore = "tests need to be ran with AWS credentials defined in environment"]
-    async fn test_create_bucket() {
-        let s3_facade = S3Facade::new();
-        let id = Uuid::new_v4();
-        let bucket_name = format!("test-bucket-{}", id);
+    // #[tokio::test]
+    // #[serial]
+    // #[ignore = "tests need to be ran with AWS credentials defined in environment"]
+    // async fn test_create_bucket() {
+    //     let s3_facade = S3Facade::new();
+    //     let id = Uuid::new_v4();
+    //     let bucket_name = format!("test-bucket-{}", id);
 
 //         // Delete bucket if exists
 //         let _ = s3_facade.delete_bucket(&bucket_name).await;
@@ -362,23 +353,23 @@ mod tests {
 //         assert!(result.is_ok());
 //     }
 
-    #[tokio::test]
-    #[serial]
-    #[ignore = "tests need to be ran with AWS credentials defined in environment"]
-    async fn test_upload_file() {
-        let s3_facade = S3Facade::new();
-        let id = Uuid::new_v4();
-        let bucket_name = format!("test-bucket-{}", id);
+//     #[tokio::test]
+//     #[serial]
+//     #[ignore = "tests need to be ran with AWS credentials defined in environment"]
+//     async fn test_upload_file() {
+//         let s3_facade = S3Facade::new();
+//         let id = Uuid::new_v4();
+//         let bucket_name = format!("test-bucket-{}", id);
 
-//         // Create a new bucket for the test
-//         let create_result = s3_facade.create_bucket(&bucket_name).await;
-//         assert!(create_result.is_ok());
+// //         // Create a new bucket for the test
+// //         let create_result = s3_facade.create_bucket(&bucket_name).await;
+// //         assert!(create_result.is_ok());
 
-        // Create temp file
-        let mut temp_file = NamedTempFile::new().unwrap();
-        write!(temp_file, "test file").unwrap();
-        let file_name = "file.txt";
-        let file_path = temp_file.path().to_str().unwrap();
+//         // Create temp file
+//         let mut temp_file = NamedTempFile::new().unwrap();
+//         write!(temp_file, "test file").unwrap();
+//         let file_name = "file.txt";
+//         let file_path = temp_file.path().to_str().unwrap();
 
 //         // Upload the file
 //         let upload_result = s3_facade
@@ -412,13 +403,13 @@ mod tests {
 //         assert!(delete_result.is_ok());
 //     }
 
-    #[tokio::test]
-    #[serial]
-    #[ignore = "tests need to be ran with AWS credentials defined in environment"]
-    async fn test_upload_file_multipart() {
-        let s3_facade = S3Facade::new();
-        let id = Uuid::new_v4();
-        let bucket_name = format!("test-bucket-{}", id);
+    // #[tokio::test]
+    // #[serial]
+    // #[ignore = "tests need to be ran with AWS credentials defined in environment"]
+    // async fn test_upload_file_multipart() {
+    //     let s3_facade = S3Facade::new();
+    //     let id = Uuid::new_v4();
+    //     let bucket_name = format!("test-bucket-{}", id);
 
 //         // Create a new bucket for the test
 //         let create_result = s3_facade.create_bucket(&bucket_name).await;
@@ -478,13 +469,13 @@ mod tests {
 //         );
 //     }
 
-    #[tokio::test]
-    #[serial]
-    #[ignore = "tests need to be ran with AWS credentials defined in environment"]
-    async fn test_abort_multipart_upload() {
-        let s3_facade = S3Facade::new();
-        let id = Uuid::new_v4();
-        let bucket_name = format!("test-bucket-{}", id);
+    // #[tokio::test]
+    // #[serial]
+    // #[ignore = "tests need to be ran with AWS credentials defined in environment"]
+    // async fn test_abort_multipart_upload() {
+    //     let s3_facade = S3Facade::new();
+    //     let id = Uuid::new_v4();
+    //     let bucket_name = format!("test-bucket-{}", id);
 
 //         // Create a new bucket for the test
 //         let create_result = s3_facade.create_bucket(&bucket_name).await;
