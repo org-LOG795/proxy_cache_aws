@@ -30,7 +30,6 @@ impl S3Facade {
         S3Facade { client }
     }
 
-
     // Get an object form S3
     pub async fn get_item(&self, bucket_name: &str, file_name: &str) -> Result<Vec<u8>, Box<dyn Error>> {
         let get_obj_req = rusoto_s3::GetObjectRequest {
@@ -47,7 +46,6 @@ impl S3Facade {
 
         Ok(buffer)
     }
-
 
     // Upload file to specific bucket
     pub async fn upload_file(
@@ -226,11 +224,13 @@ mod tests {
     use tempfile::NamedTempFile;
     use uuid::Uuid;
     use serial_test::serial;
+    use tokio::runtime::Builder;
 
     // Minimum part size for S3 is 5MB
     // Maximmim nuber of parts is 10000
     // Current part size allows for 50 * 10000 = 50GB size
     const PART_SIZE: usize = 5_242_8800;
+
 
     #[tokio::test]
     #[serial]
@@ -287,7 +287,6 @@ mod tests {
             "Bucket deletion assertion failed"
         );
     }
-    
 
     #[tokio::test]
     #[serial]
