@@ -224,7 +224,6 @@ mod tests {
     use tempfile::NamedTempFile;
     use uuid::Uuid;
     use serial_test::serial;
-    use tokio::runtime::Builder;
 
     // Minimum part size for S3 is 5MB
     // Maximmim nuber of parts is 10000
