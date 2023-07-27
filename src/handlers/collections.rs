@@ -12,22 +12,22 @@ use facades::postgres_facade::get_offset;
 pub async fn save(bytes: Vec<u8>, client: Object) -> Result<String, String> {
     
     //Compress
-    match gzip_compress(bytes) {
-        Ok(compressed) => {
-            let offsets = get_offset(client, compressed.len()).await;
+    // match gzip_compress(bytes) {
+    //     Ok(compressed) => {
+    //         let offsets = get_offset(client, compressed.len()).await;
 
-            offsets
-                .map(|o| format!("nom_fichier_{start}_{stop}.gz", start = o.0, stop = o.1))
-                .and_then(|file_name| ())
-                .map_err(|err| err.to_string())
+    //         offsets
+    //             .map(|o| format!("nom_fichier_{start}_{stop}.gz", start = o.0, stop = o.1))
+    //             .and_then(|file_name| ())
+    //             .map_err(|err| err.to_string())
 
-            todo!()
-        }
-        Err(_) => todo!(),
-    }
+    //         todo!()
+    //     }
+    //     Err(_) => todo!(),
+    // }
 
     //Ask bd
-    let offsets = get_offset(client, )
+    // let offsets = get_offset(client, )
 
     todo!()
 }
