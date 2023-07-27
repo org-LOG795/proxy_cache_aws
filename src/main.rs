@@ -1,27 +1,19 @@
 pub mod middlewares;
-use deadpool_postgres::Pool;
 use middlewares::tracing::tracing_fn;
 
 pub mod handlers;
 use handlers::general::pong;
-use handlers::collections::{get as get_collection, save as save_collection};
+use handlers::collections::collection_handler;
 
 pub mod facades;
 use facades::postgres_facade::{create_config_from_env, create_pool};
 
 use axum::{
-    response::Html, 
-    routing::get,
+    routing::{any, get},
     Router,
-    middleware,
-    extract::State, Json,
+    middleware
 };
-use deadpool_postgres::{Pool};
-use middlewares::tracing::tracing_fn;
-use facades::postgres_facade::{create_config_from_env, create_pool};
 use std::{env, net::SocketAddr};
-use serde::{Serialize, Deserialize};
-
 use crate::middlewares::tracing;
 
 
@@ -38,16 +30,15 @@ fn create_addr(host: &str, port: &str) -> Result<SocketAddr, String> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::init_tracing_with_jaeger()?;
-    let secret_test = Config {secret: "olo".to_string()};
 
     let postgres_config = create_config_from_env().expect("Unable to load");
     let postgres_pool = create_pool(postgres_config, 3).unwrap();
 
-    let client = postgres_pool.get().await.unwrap();
-
     // build our application with a route
     let app = Router::new()
         .route("/ping", get(pong))
+        .route("/collection/*collection", any(collection_handler))
+        .with_state(postgres_pool)
         .layer(middleware::from_fn(tracing_fn));
 
     let app_host = env::var("APP_HOST").unwrap_or("0.0.0.0".to_string());
@@ -66,9 +57,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(err) => println!("ABORTING => {}", err.to_string())
     }
-Ok(())
+    Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
