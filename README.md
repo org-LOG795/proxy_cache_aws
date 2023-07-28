@@ -1,7 +1,12 @@
-# proxy_cache_aws
+# Local Test
 
-## To run jaeger
-- docker run -d --name jaeger -p 6831:6831/udp -p 16686:16686 jaegertracing/all-in-one:latest
+## create bridge network between docker-prometheus and the app
 
-## To acces jaeger UI
-http://localhost:16686/
+docker network create prometheus-network
+docker network connect prometheus-network "name your prometheus container"
+docker restart "name your prometheus container"
+<!-- docker network connect prometheus-network proxy_cache_aws-prometheus-1
+docker restart proxy_cache_aws-prometheus-1 -->
+
+## in prometheus.yml put as ip: 
+"host.docker.internal"

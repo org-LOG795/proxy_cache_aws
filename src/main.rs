@@ -4,6 +4,7 @@ use middlewares::tracing::tracing_fn;
 pub mod handlers;
 use handlers::general::pong;
 use handlers::collections::collection_handler;
+use handlers::metrics::handle_metrics;
 
 pub mod facades;
 use facades::postgres_facade::{create_config_from_env, create_pool};
@@ -15,6 +16,7 @@ use axum::{
 };
 use std::{env, net::SocketAddr};
 use crate::middlewares::tracing;
+use crate::facades::compression::{gzip_compress, gzip_decompress};
 
 
 #[derive(Clone)]
@@ -29,7 +31,7 @@ fn create_addr(host: &str, port: &str) -> Result<SocketAddr, String> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing::init_tracing_with_jaeger()?;
+    tracing::init_tracing()?;
 
     let postgres_config = create_config_from_env().expect("Unable to load");
     let postgres_pool = create_pool(postgres_config, 3).unwrap();
@@ -38,6 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/ping", get(pong))
         .route("/collection/*collection", any(collection_handler))
+        .route("/metrics", get(handle_metrics))
         .with_state(postgres_pool)
         .layer(middleware::from_fn(tracing_fn));
 
@@ -45,6 +48,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_port = env::var("APP_PORT").unwrap_or("5000".to_string());
     //Create app url
     let addr = create_addr(&app_host, &app_port);
+    
+    test_prometheus();
 
     match addr {
         Ok(valid_addr) => {
@@ -57,7 +62,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(err) => println!("ABORTING => {}", err.to_string())
     }
+    
     Ok(())
+}
+
+fn test_prometheus() {
+    // Données à compresser
+    let data = b"Hello, world!";
+    println!("Original data: {:?}", data);
+
+    // Compresser les données
+    let compressed_data = gzip_compress(data.to_vec()).unwrap();
+    println!("Compressed data: {:?}", compressed_data);
+
+    // Décompresser les données
+    let decompressed_data = gzip_decompress(compressed_data).unwrap();
+    println!("Decompressed data: {:?}", decompressed_data);
 }
 
 #[cfg(test)]
