@@ -1,8 +1,7 @@
 use std::env;
-use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod, ClientWrapper, Object};
+use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod, Object};
 use tokio_postgres::{Config, NoTls};
 use chrono::{Utc, Datelike};
-use tracing_subscriber::fmt::format;
 
 pub fn create_config(host: &str, user: &str, pass: &str, db: &str) -> Config {
     let mut configs = Config::new();
@@ -86,7 +85,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "tests need to be ran with local postgres db"]
+    #[ignore = "postgres"]
     async fn create_client() {
         let pg_config = get_test_config();
         let pool = create_pool(pg_config, 1);
@@ -96,7 +95,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "tests need to be ran with local postgres db"]
+    #[ignore = "postgres"]
     async fn select_statement() {
         let pg_config = get_test_config();
         let pool = create_pool(pg_config, 1);
@@ -117,7 +116,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "tests need to be ran with local postgres db"]
+    #[ignore = "postgres"]
     async fn get_offset_test() {
         let pg_config = get_test_config();
         let pool = create_pool(pg_config, 1);

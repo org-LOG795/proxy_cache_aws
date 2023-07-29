@@ -1,29 +1,20 @@
 pub mod middlewares;
-use deadpool_postgres::Pool;
 use middlewares::tracing::tracing_fn;
 
 pub mod handlers;
+use handlers::collections::collection_handler;
 use handlers::general::pong;
-use handlers::collections::{get as get_collection, save as save_collection};
 
 pub mod facades;
 use facades::postgres_facade::{create_config_from_env, create_pool};
 
-use axum::{
-    response::Html, 
-    routing::get,
-    Router,
-    middleware,
-    extract::State, Json,
-};
-// use deadpool_postgres::{Pool};
-// use middlewares::tracing::tracing_fn;
-// use facades::postgres_facade::{create_config_from_env, create_pool};
-use std::{env, net::SocketAddr};
-use serde::{Serialize, Deserialize};
-
 use crate::middlewares::tracing;
-
+use axum::{
+    middleware,
+    routing::{any, get},
+    Router,
+};
+use std::{env, net::SocketAddr};
 
 #[derive(Clone)]
 pub struct Config {
@@ -32,22 +23,23 @@ pub struct Config {
 
 fn create_addr(host: &str, port: &str) -> Result<SocketAddr, String> {
     let format = format!("{}:{}", host, port);
-    format.parse::<SocketAddr>().map_err(|_| format!("{} is not a valid app address", format))
+    format
+        .parse::<SocketAddr>()
+        .map_err(|_| format!("{} is not a valid app address", format))
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::init_tracing_with_jaeger()?;
-    let secret_test = Config {secret: "olo".to_string()};
 
     let postgres_config = create_config_from_env().expect("Unable to load");
     let postgres_pool = create_pool(postgres_config, 3).unwrap();
 
-    let client = postgres_pool.get().await.unwrap();
-
     // build our application with a route
     let app = Router::new()
         .route("/ping", get(pong))
+        .route("/collection/*collection", any(collection_handler))
+        .with_state(postgres_pool)
         .layer(middleware::from_fn(tracing_fn));
 
     let app_host = env::var("APP_HOST").unwrap_or("0.0.0.0".to_string());
@@ -64,11 +56,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .await
                 .unwrap();
         }
-        Err(err) => println!("ABORTING => {}", err.to_string())
+        Err(err) => println!("ABORTING => {}", err.to_string()),
     }
-Ok(())
+    Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
