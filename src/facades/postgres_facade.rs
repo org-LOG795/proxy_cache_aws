@@ -37,18 +37,19 @@ fn get_current_date() -> String {
     format!("{:04}-{:02}-{:02}", current_date.year(), current_date.month(), current_date.day())
 }
 
-pub async fn get_offset(client: Object, len_bytes: usize) -> Result<(i64, i64), String>{
+pub async fn get_offset(client: Object, collection: String, len_bytes: usize) -> Result<(i64, i64), String>{
     let current_date = get_current_date();
     let table = "\"CacheOffsetTable\"".to_string();
     let date = "\"date\"".to_string();
+    let collection_col = "\"collection\"".to_string();
     let offset = "\"offset\"".to_string();
     
     let query = format!(
-        "INSERT INTO public.{table} ({date}, {offset}) VALUES (DATE '{current_date}', {len_bytes})\n
-        ON CONFLICT ({date}) DO\n
+        "INSERT INTO public.{table} ({date}, {collection_col}, {offset}) VALUES (DATE '{current_date}', '{collection}' ,{len_bytes})\n
+        ON CONFLICT ({date}, {collection_col}) DO\n
         UPDATE SET {offset} = {table}.{offset} + {len_bytes}\n
         RETURNING {table}.{offset};\n", 
-        table = table, date = date, offset = offset, len_bytes = len_bytes);
+        table = table, date = date, offset = offset, len_bytes = len_bytes, collection_col = collection_col, collection = collection);
 
     match client.prepare_cached(&query).await {
         Ok(statement) => {
@@ -123,7 +124,7 @@ mod tests {
         assert!(pool.is_ok());
         let client = pool.unwrap().get().await.unwrap();
 
-        match get_offset(client, 20).await {
+        match get_offset(client, "test".to_string(), 20).await {
             Ok(offsets) => println!("({},{})", offsets.0, offsets.1),
             Err(err) => println!("{}", err.to_string())
         }

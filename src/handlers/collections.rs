@@ -85,7 +85,7 @@ async fn post_handler(collection: String, bytes: Vec<u8>, postgres_client: Objec
     //Compress
     match gzip_compress(bytes) {
         Ok(compressed) => {
-            if let Ok(offsets) = get_offset(postgres_client, compressed.len()).await {
+            if let Ok(offsets) = get_offset(postgres_client, collection.clone(), compressed.len()).await {
                 write_efs(compressed, &collection, offsets.0, offsets.1).await
                     .map(|_|format!("{collection}?start={start}&end={end}",collection = collection, start = offsets.0, end = offsets.1).to_string())
                     .map_err(|err| err.to_string())
