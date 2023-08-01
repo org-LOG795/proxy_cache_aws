@@ -45,29 +45,13 @@ pub async fn archive_to_s3(
                 .await;
             }
         }
+        // s3::upload_file_multipart(bucket_name, &combined_file_name, file_name, part_size).await;
+        // let combined_file_path = format!("{}/{}", path, combined_file_name);
+        // fs::remove_file(&combined_file_path).await?;
     }
 
     Ok(())
 }
-
-// for file_name in file_names {
-//     println!("{}", file_name);
-// let mut input_file = File::open(file_name).await?;
-// let mut buffer = Vec::new();
-// input_file.read_to_end(&mut buffer).await?;
-// output_file.write_all(&buffer).await?;
-// }
-
-//TODO : name combined file accordigly
-// let combined_file_name = "combined_file.txt";
-// get_files_from_efs().await?; // Combine the files and write to combined_file.txt
-
-// Upload the combined file to S3 using multipart
-// s3::upload_file_multipart(bucket_name, &combined_file_name, file_name, part_size).await?;
-
-// Optional: Delete the combined file after uploading to S3
-// let combined_file_path = format!("{}/{}", path, combined_file_name);
-// fs::remove_file(&combined_file_path).await?;
 
 async fn get_file_size(file_path: &str) -> u64 {
     if let Ok(metadata) = fs::metadata(file_path).await {
