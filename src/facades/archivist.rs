@@ -19,7 +19,6 @@ pub async fn archive_to_s3(
     for directory in directories_list.unwrap() {
         let directory_path = format!("{}/{}", master_directory_path, directory.as_str());
         // let output_file_name = format!("{}", directory.as_str());
-        let output_file_name = directory_path.clone();
 
         let mut options = OpenOptions::new();
         let output_options = options.write(true).append(true).create(true);
@@ -30,18 +29,20 @@ pub async fn archive_to_s3(
 
         while let Ok(Some(file)) = files_list.next_entry().await {
             let path = file.path();
+            let mut output_file_name = format!("{}", directory.as_str());
 
             if let Some(file_name) = path.file_name().and_then(|os_str| os_str.to_str()) {
-                if !file_name.contains(".manifest") {
-                    let bytes = efs_facade::read_file(file_name.to_string()).await;
-
-                    let _ = efs_facade::create_file(
-                        &output_file_name,
-                        &bytes.unwrap().as_slice(),
-                        output_options,
-                    )
-                    .await;
+                if file_name.contains(".manifest") {
+                    output_file_name = format!("{}.json", directory.as_str());
                 }
+                let bytes = efs_facade::read_file(file_name.to_string()).await;
+
+                let _ = efs_facade::create_file(
+                    &output_file_name,
+                    &bytes.unwrap().as_slice(),
+                    output_options,
+                )
+                .await;
             }
         }
     }
