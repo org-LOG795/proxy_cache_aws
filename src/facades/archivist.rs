@@ -1,104 +1,115 @@
 use std::error::Error;
-use tokio::fs::{self, File};
+use std::path::Path;
+use tokio::fs::{self, File, OpenOptions};
+use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tracing_subscriber::filter::Directive;
-use tokio::io::AsyncWriteExt;
 
-use super::{efs_facade::EfsFacade, s3::S3Facade};
+use super::efs_facade::{self};
+use super::s3::{self};
 
-pub struct Archivist {
-    efs_facade: EfsFacade,
-    s3_facade: S3Facade,
-}
+//Read from EFS and write to an S3 bucket
+pub async fn archive_to_s3(
+    master_directory_path: &str,
+    bucket_name: &str,
+    part_size: usize,
+) -> Result<(), String> {
+    println!("hello!");
+    let directories_list = efs_facade::get_directories_list(master_directory_path).await;
 
-impl Archivist {
-   
-    pub fn new(efs_facade: EfsFacade, s3_facade: S3Facade) -> Self {
-        Archivist {
-            efs_facade,
-            s3_facade,
-        }
-    }
+    for directory in directories_list.unwrap() {
+        let directory_path = format!("{}/{}", master_directory_path, directory.as_str());
+        // let output_file_name = format!("{}", directory.as_str());
+        let output_file_name = directory_path.clone();
 
-    //Read from EFS and write to an S3 bucket
-    pub async fn archive_to_s3(
-        &self,
-        file_name: &str,
-        bucket_name: &str,
-        part_size: usize,
-    ) -> Result<(), Box<dyn Error>> {
-        let path = "temp";
+        let mut options = OpenOptions::new();
+        let output_options = options.write(true).append(true).create(true);
 
-        //TODO : name combined file accordigly
-        let combined_file_name = "combined_file.txt"; 
-        self.get_files_from_efs().await?; // Combine the files and write to combined_file.txt
+        let mut files_list = fs::read_dir(directory_path)
+            .await
+            .map_err(|err| err.to_string())?;
 
-        // Upload the combined file to S3 using multipart
-        self.s3_facade
-            .upload_file_multipart(bucket_name, &combined_file_name, file_name, part_size)
-            .await?;
+        while let Ok(Some(file)) = files_list.next_entry().await {
+            let path = file.path();
 
-        // Optional: Delete the combined file after uploading to S3
-        let combined_file_path = format!("{}/{}", path, combined_file_name);
-        fs::remove_file(&combined_file_path).await?;
+            if let Some(file_name) = path.file_name().and_then(|os_str| os_str.to_str()) {
+                if !file_name.contains(".manifest") {
+                    let bytes = efs_facade::read_file(file_name.to_string()).await;
 
-        Ok(())
-    }
-
-    async fn get_files_from_efs(&self) -> Result<(), Box<dyn Error>> {
-        let path = "temp";
-        let directories_list = self.efs_facade.get_directories_list(path).await?;
-
-        let mut combined_bytes = Vec::new();
-
-        for directory_name in &directories_list {
-
-            let manifest_str = ".manifest".to_string();
-
-            // Skip manifest files and offset
-            if !directory_name.ends_with(manifest_str.as_str()) && *directory_name != "offset" {
-                let file_path = format!("{}/{}", path, directory_name);
-                let file_bytes = self.efs_facade.read(&file_path).await?;
-                combined_bytes.extend_from_slice(&file_bytes);
+                    let _ = efs_facade::create_file(
+                        &output_file_name,
+                        &bytes.unwrap().as_slice(),
+                        output_options,
+                    )
+                    .await;
+                }
             }
         }
-
-        // Write the combined bytes to temp file
-        let combined_file_name = "combined_file.txt";
-        let combined_file_path = format!("{}/{}", path, combined_file_name);
-        let mut combined_file = File::create(&combined_file_path).await?;
-        combined_file.write_all(&combined_bytes).await?; 
-
-        Ok(())
-
     }
 
-
-    async fn get_file_size(&self, file_path: &str) -> u64 {
-        if let Ok(metadata) = fs::metadata(file_path).await {
-            metadata.len()
-        } else {
-            0
-        }
-    }
-
-    fn calculate_part_size(&self, file_size: u64) -> usize {
-        // Adjust the part size calculation according to the file size
-        if file_size > 5_000_000_000_000 {
-            // If file size is larger than 5TB
-            100_000_000 // Use a part size of 100MB
-        } else if file_size > 100_000_000 {
-            // If file size is larger than 100MB
-            10_000_000 // Use a part size of 10MB
-        } else {
-            // If file size is smaller than 100MB
-            8_000_000 // Use the default part size of 8MB
-        }
-    }
-
+    Ok(())
 }
 
+// for file_name in file_names {
+//     println!("{}", file_name);
+// let mut input_file = File::open(file_name).await?;
+// let mut buffer = Vec::new();
+// input_file.read_to_end(&mut buffer).await?;
+// output_file.write_all(&buffer).await?;
+// }
+
+//TODO : name combined file accordigly
+// let combined_file_name = "combined_file.txt";
+// get_files_from_efs().await?; // Combine the files and write to combined_file.txt
+
+// Upload the combined file to S3 using multipart
+// s3::upload_file_multipart(bucket_name, &combined_file_name, file_name, part_size).await?;
+
+// Optional: Delete the combined file after uploading to S3
+// let combined_file_path = format!("{}/{}", path, combined_file_name);
+// fs::remove_file(&combined_file_path).await?;
+
+async fn get_file_size(file_path: &str) -> u64 {
+    if let Ok(metadata) = fs::metadata(file_path).await {
+        metadata.len()
+    } else {
+        0
+    }
+}
+
+fn calculate_part_size(file_size: u64) -> usize {
+    // Adjust the part size calculation according to the file size
+    if file_size > 5_000_000_000_000 {
+        // If file size is larger than 5TB
+        100_000_000 // Use a part size of 100MB
+    } else if file_size > 100_000_000 {
+        // If file size is larger than 100MB
+        10_000_000 // Use a part size of 10MB
+    } else {
+        // If file size is smaller than 100MB
+        8_000_000 // Use the default part size of 8MB
+    }
+}
 
 #[cfg(test)]
-mod tests {
+mod archivist_test {
+    use super::*;
+    use tokio::fs;
 
+    use crate::facades::efs_facade;
+
+    #[tokio::test]
+    async fn test_archive_to_s3() {
+        let directory_name = "test-dir";
+        fs::create_dir(directory_name).await;
+        let file_name = "test-dir/archive-test-write";
+        let file_name_2 = "test-dir/archive-test-write-2";
+        let data = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
+        let bytes = data.as_bytes();
+
+        efs_facade::write((&bytes).to_vec(), file_name, 0, 574).await;
+        efs_facade::write((&bytes).to_vec(), file_name, 574, 1148).await;
+        efs_facade::write((&bytes).to_vec(), file_name_2, 0, 574).await;
+
+        let archivist = archive_to_s3(directory_name, "bucket", 64).await;
+    }
 }

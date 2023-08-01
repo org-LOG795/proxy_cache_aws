@@ -5,7 +5,7 @@ use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use deadpool_postgres::{Object, Pool};
 use facades::compression::gzip_compress;
-use facades::efs_facade::{new_read as read_efs, write as write_efs};
+use facades::efs_facade::{read as read_efs, write as write_efs};
 use facades::postgres_facade::get_offset;
 use facades::s3::{init_client as init_s3_client, read_file as read_s3};
 use hyper::body::to_bytes;
