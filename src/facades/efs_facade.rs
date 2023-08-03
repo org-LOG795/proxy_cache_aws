@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::ops::Range;
 use std::path::Path;
-use tokio::fs::{self, File, OpenOptions};
-use tokio::io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
+use tokio::fs::{self, OpenOptions};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Metadata {
