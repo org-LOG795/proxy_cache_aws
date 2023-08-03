@@ -94,11 +94,10 @@ pub async fn read_file(file_path: String) -> Result<Vec<u8>, Box<dyn Error>> {
     match options.open(file_path).await {
         Ok(mut file) => {
             file.read_to_end(&mut buffer).await?;
-            println!("{}", buffer.len());
         }
 
         Err(e) => {
-            println!("Error opening file: {}", e);
+            println!("Error reading file: {}", e);
             return Err(Box::new(e));
         }
     }

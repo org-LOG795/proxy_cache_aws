@@ -44,10 +44,18 @@ pub async fn archive_to_s3(
                     output_file_name = format!("{}.json", directory);
                 }
 
-                let bytes = efs_facade::read_file(file_name.to_string()).await;
+                println!("{}", file_name);
+                let file_path = format!("{}/{}/{}", master_directory_path, directory, file_name);
+
+                let bytes = efs_facade::read_file(file_path.to_string()).await;
+
+                let output_file_path = format!(
+                    "{}/{}/{}",
+                    master_directory_path, directory, output_file_name
+                );
 
                 let _ = efs_facade::create_file(
-                    &output_file_name,
+                    &output_file_path,
                     &bytes.unwrap().as_slice(),
                     output_options,
                 )
