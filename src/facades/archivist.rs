@@ -61,10 +61,9 @@ pub async fn archive_to_s3(
                 )
                 .await;
             }
+            // s3::upload_file_multipart(bucket_name, &directory_path, &directory, part_size).await;
+            // efs_facade::delete(&directory_path).await;
         }
-        // s3::upload_file_multipart(bucket_name, &combined_file_name, file_name, part_size).await;
-        // let combined_file_path = format!("{}/{}", path, combined_file_name);
-        // fs::remove_file(&combined_file_path).await?;
     }
 
     Ok(())
@@ -113,5 +112,6 @@ mod archivist_test {
         efs_facade::write((&bytes).to_vec(), file_name_2, 0, 574).await;
 
         let archivist = archive_to_s3(directory_name, "bucket", 64).await;
+        assert!(archivist.is_ok());
     }
 }
