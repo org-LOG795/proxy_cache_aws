@@ -13,28 +13,37 @@ pub async fn archive_to_s3(
     bucket_name: &str,
     part_size: usize,
 ) -> Result<(), String> {
-    println!("hello!");
     let directories_list = efs_facade::get_directories_list(master_directory_path).await;
 
-    for directory in directories_list.unwrap() {
-        let directory_path = format!("{}/{}", master_directory_path, directory.as_str());
-        // let output_file_name = format!("{}", directory.as_str());
+    let directories_list = match directories_list {
+        Ok(directories_list) => directories_list,
+        Err(err) => {
+            return Err(format!("Error fetching directories: {}", err));
+        }
+    };
+
+    for directory in directories_list {
+        let directory_path = format!("{}/{}", master_directory_path, directory);
+
+        let mut files_list = match fs::read_dir(directory_path).await {
+            Ok(files) => files,
+            Err(err) => {
+                return Err(format!("Error reading directory: {}", err));
+            }
+        };
 
         let mut options = OpenOptions::new();
         let output_options = options.write(true).append(true).create(true);
 
-        let mut files_list = fs::read_dir(directory_path)
-            .await
-            .map_err(|err| err.to_string())?;
-
         while let Ok(Some(file)) = files_list.next_entry().await {
             let path = file.path();
-            let mut output_file_name = format!("{}", directory.as_str());
+            let mut output_file_name = format!("{}", directory);
 
             if let Some(file_name) = path.file_name().and_then(|os_str| os_str.to_str()) {
                 if file_name.contains(".manifest") {
-                    output_file_name = format!("{}.json", directory.as_str());
+                    output_file_name = format!("{}.json", directory);
                 }
+
                 let bytes = efs_facade::read_file(file_name.to_string()).await;
 
                 let _ = efs_facade::create_file(
