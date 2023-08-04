@@ -44,10 +44,9 @@ pub async fn archive_to_s3(
                     output_file_name = format!("{}.json", directory);
                 }
 
-                println!("{}", file_name);
                 let file_path = format!("{}/{}/{}", master_directory_path, directory, file_name);
 
-                let bytes = efs_facade::read_file(file_path.to_string()).await;
+                let bytes = efs_facade::read_file(&file_path.to_string()).await;
 
                 let output_file_path = format!(
                     "{}/{}/{}",
@@ -62,8 +61,9 @@ pub async fn archive_to_s3(
                 .await;
             }
             // s3::upload_file_multipart(bucket_name, &directory_path, &directory, part_size).await;
-            // efs_facade::delete(&directory_path).await;
         }
+        let directory_path_for_delete = format!("{}/{}", master_directory_path, directory);
+        efs_facade::delete(&directory_path_for_delete).await;
     }
 
     Ok(())
@@ -113,5 +113,7 @@ mod archivist_test {
 
         let archivist = archive_to_s3(directory_name, "bucket", 64).await;
         assert!(archivist.is_ok());
+        let deleted = efs_facade::delete(directory_name).await;
+        assert!(deleted.is_ok());
     }
 }

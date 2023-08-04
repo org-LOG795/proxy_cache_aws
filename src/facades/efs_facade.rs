@@ -18,7 +18,7 @@ async fn create_dir(dir_name: &str) -> Result<(), tokio::io::Error> {
 
     match fs::create_dir(path).await {
         Ok(_) => {
-            println!("Directory created: {:#?}", path);
+            println!("Created directory: {:#?}", path);
             Ok(())
         }
         Err(err) if err.kind() == tokio::io::ErrorKind::AlreadyExists => {
@@ -69,16 +69,14 @@ pub async fn create_file(
     bytes: &[u8],
     options: &mut OpenOptions,
 ) -> Result<(), Box<dyn Error>> {
-    let file_name = file_path.clone();
-
     match options.open(file_path).await {
         Ok(mut file) => {
             file.write_all(bytes).await?;
-            println!("File created: {}", file_name);
+            println!("Bytes were written into file: {}", file_path);
         }
 
         Err(e) => {
-            println!("Error opening file: {}", e);
+            println!("Error writting into file: {}, {}", file_path, e);
             return Err(Box::new(e));
         }
     }
@@ -86,7 +84,7 @@ pub async fn create_file(
     Ok(())
 }
 
-pub async fn read_file(file_path: String) -> Result<Vec<u8>, Box<dyn Error>> {
+pub async fn read_file(file_path: &String) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut options = OpenOptions::new();
     options.read(true);
     let mut buffer = Vec::new();
@@ -94,10 +92,11 @@ pub async fn read_file(file_path: String) -> Result<Vec<u8>, Box<dyn Error>> {
     match options.open(file_path).await {
         Ok(mut file) => {
             file.read_to_end(&mut buffer).await?;
+            println!("Bytes were read from file: {}", file_path);
         }
 
         Err(e) => {
-            println!("Error reading file: {}", e);
+            println!("Error reading file: {}, {}", file_path, e);
             return Err(Box::new(e));
         }
     }
@@ -197,7 +196,7 @@ pub async fn read(archive_name: &str, start: i64, end: i64) -> Result<Option<Vec
     let path = Path::new(&bytes_file_path);
 
     if path.exists() {
-        let bytes = read_file(bytes_file_path).await;
+        let bytes = read_file(&bytes_file_path).await;
 
         bytes.map(|b| Some(b)).map_err(|err| err.to_string())
     } else {
@@ -249,6 +248,7 @@ pub async fn get_directories_list(directory_path: &str) -> Result<Vec<String>, S
 
 pub async fn delete(archive_name: &str) -> Result<(), Box<dyn Error>> {
     fs::remove_dir_all(archive_name).await?;
+    println!("File path deleted: {}", archive_name);
     Ok(())
 }
 
@@ -293,10 +293,6 @@ mod efs_facade_test {
                 let mut bytes_file =
                     File::open(bytes_file_path).expect("Failed to open the bytes file");
 
-                // let offset_file_path = format!("{}/{}", file_name, "offset");
-                // let mut offset_file =
-                //     File::open(offset_file_path).expect("Failed to open the offset file");
-
                 let manifest_file_path =
                     format!("{}/{}.{}", file_name, offset_range_string, "manifest");
 
@@ -309,13 +305,7 @@ mod efs_facade_test {
 
                 let actual_bytes = String::from_utf8_lossy(&buffer);
 
-                // let mut buffer = Vec::new();
-                // offset_file
-                //     .read_to_end(&mut buffer)
-                //     .expect("Failed to read the offset file");
-
                 assert_eq!(actual_bytes, data);
-                // assert_eq!(offset_file.metadata().unwrap().len(), 8);
                 assert!(mainfest_path.exists());
 
                 let completed = delete(file_name).await;
