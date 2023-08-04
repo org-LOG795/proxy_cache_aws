@@ -53,7 +53,7 @@ pub async fn archive_to_s3(
                     master_directory_path, directory, output_file_name
                 );
 
-                let _ = efs_facade::create_file(
+                let _ = efs_facade::write_file(
                     &output_file_path,
                     &bytes.unwrap().as_slice(),
                     output_options,
