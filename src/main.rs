@@ -6,7 +6,6 @@ use handlers::general::pong;
 use handlers::collections::collection_handler;
 
 pub mod facades;
-use facades::postgres_facade::{create_config_from_env, create_pool};
 
 use axum::{
     routing::{any, get},
@@ -31,14 +30,10 @@ fn create_addr(host: &str, port: &str) -> Result<SocketAddr, String> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::init_tracing_with_jaeger()?;
 
-    let postgres_config = create_config_from_env().expect("Unable to load");
-    let postgres_pool = create_pool(postgres_config, 3).unwrap();
-
     // build our application with a route
     let app = Router::new()
         .route("/ping", get(pong))
         .route("/collection/*collection", any(collection_handler))
-        .with_state(postgres_pool)
         .layer(middleware::from_fn(tracing_fn));
 
     let app_host = env::var("APP_HOST").unwrap_or("0.0.0.0".to_string());
