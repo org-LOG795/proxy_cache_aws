@@ -151,12 +151,16 @@ mod archivist_test {
         fs::create_dir(directory_name).await;
         let file_name = "test-directory/archive-test-write";
         let file_name_2 = "test-directory/archive-test-write-2";
-        let data = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
-        let bytes = data.as_bytes();
+        let test_file_path = format!("{}", "test_files/lorem.txt");
 
-        efs_facade::write((&bytes).to_vec(), file_name, 0, 574).await;
-        efs_facade::write((&bytes).to_vec(), file_name, 574, 1148).await;
-        efs_facade::write((&bytes).to_vec(), file_name_2, 0, 574).await;
+        let data = efs_facade::read_file(&test_file_path).await;
+        assert!(data.is_ok());
+
+        let bytes = data.unwrap();
+
+        efs_facade::write(bytes.clone(), file_name, 0, 574).await;
+        efs_facade::write(bytes.clone(), file_name, 574, 1148).await;
+        efs_facade::write(bytes.clone(), file_name_2, 0, 574).await;
 
         let archivist = archive_to_s3(directory_name, "bucket", 64).await;
         assert!(archivist.is_ok());

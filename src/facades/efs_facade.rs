@@ -143,16 +143,19 @@ mod efs_facade_test {
 
     #[tokio::test]
     async fn test_read() {
-        // Prepare
         let archive_name = "archive-test-read";
-        let data = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
-        let bytes = data.as_bytes();
+        let test_file_path = format!("{}", "test_files/lorem.txt");
 
-        let offset = write((&bytes).to_vec(), archive_name, 0, 574).await;
+        let data = read_file(&test_file_path).await;
+        assert!(data.is_ok());
+
+        let bytes = data.unwrap();
+
+        let offset = write(bytes.clone(), archive_name, 0, 574).await;
         assert!(offset.is_ok());
 
         let result = read(archive_name, 0, 574).await;
-        assert_eq!(result, Ok(Some((&bytes).to_vec())));
+        assert_eq!(result, Ok(Some(bytes)));
 
         let completed = delete(archive_name).await;
         assert!(completed.is_ok());
@@ -162,11 +165,15 @@ mod efs_facade_test {
     async fn test_write() {
         // Prepare
         let file_name = "archive-test-write";
-        let data = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
-        let bytes = data.as_bytes();
+        let test_file_path = format!("{}", "test_files/lorem.txt");
+
+        let data = read_file(&test_file_path).await;
+        assert!(data.is_ok());
+
+        let bytes = data.unwrap();
 
         // Act
-        let result = write((&bytes).to_vec(), file_name, 0, 574).await;
+        let result = write(bytes.clone(), file_name, 0, 574).await;
 
         // Assert
         match result {
@@ -188,8 +195,9 @@ mod efs_facade_test {
                     .expect("Failed to read the bytes file");
 
                 let actual_bytes = String::from_utf8_lossy(&buffer);
+                let original_bytes = String::from_utf8_lossy(&bytes);
 
-                assert_eq!(actual_bytes, data);
+                assert_eq!(actual_bytes, original_bytes);
                 assert!(mainfest_path.exists());
 
                 let completed = delete(file_name).await;
