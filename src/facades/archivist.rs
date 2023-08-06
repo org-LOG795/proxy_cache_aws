@@ -1,11 +1,19 @@
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::path::Path;
 use tokio::fs::{self, File, OpenOptions};
-use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tracing_subscriber::filter::Directive;
 
-use super::efs_facade::{self};
+use super::efs_facade::{self, Metadata};
 use super::s3::{self};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Manifest {
+    name: String,
+    meta_source: String,
+    segments: Vec<Metadata>,
+}
 
 //Read from EFS and write to an S3 bucket
 pub async fn archive_to_s3(
@@ -35,38 +43,77 @@ pub async fn archive_to_s3(
         let mut options = OpenOptions::new();
         let output_options = options.write(true).append(true).create(true);
 
+        let mut combined_manifest = Vec::<Metadata>::new();
+        let mut output_file_name = format!("{}", directory);
+
         while let Ok(Some(file)) = files_list.next_entry().await {
             let path = file.path();
-            let mut output_file_name = format!("{}", directory);
 
             if let Some(file_name) = path.file_name().and_then(|os_str| os_str.to_str()) {
-                if file_name.contains(".manifest") {
-                    output_file_name = format!("{}.json", directory);
-                }
-
                 let file_path = format!("{}/{}/{}", master_directory_path, directory, file_name);
 
-                let bytes = efs_facade::read_file(&file_path.to_string()).await;
+                if file_name.contains(".manifest") {
+                    let manifest_segment = read_from_manifest(&file_path).await;
+                    combined_manifest.extend(manifest_segment.unwrap());
+                } else {
+                    let bytes = efs_facade::read_file(&file_path.to_string()).await;
 
-                let output_file_path = format!(
-                    "{}/{}/{}",
-                    master_directory_path, directory, output_file_name
-                );
+                    let output_file_path = format!(
+                        "{}/{}/{}",
+                        master_directory_path, directory, output_file_name
+                    );
 
-                let _ = efs_facade::write_file(
-                    &output_file_path,
-                    &bytes.unwrap().as_slice(),
-                    output_options,
-                )
-                .await;
+                    let _ = efs_facade::write_file(
+                        &output_file_path,
+                        &bytes.unwrap().as_slice(),
+                        output_options,
+                    )
+                    .await;
+                }
             }
-            // s3::upload_file_multipart(bucket_name, &directory_path, &directory, part_size).await;
         }
+
+        let manifest = Manifest {
+            name: output_file_name,
+            meta_source: "src".to_string(),
+            segments: combined_manifest,
+        };
+        let json_manifest = serde_json::to_string_pretty(&manifest);
+
+        let manifest_file_name = format!("{}-manifest.json", directory);
+        let manifest_file_path = format!(
+            "{}/{}/{}",
+            master_directory_path, directory, manifest_file_name
+        );
+
+        let _ = efs_facade::write_file(
+            &manifest_file_path,
+            json_manifest.unwrap().as_bytes(),
+            output_options,
+        )
+        .await;
+
+        // s3::upload_file_multipart(bucket_name, &directory_path, &directory, part_size).await;
         let directory_path_for_delete = format!("{}/{}", master_directory_path, directory);
         efs_facade::delete(&directory_path_for_delete).await;
     }
 
     Ok(())
+}
+
+async fn read_from_manifest(file_path: &str) -> Result<Vec<Metadata>, Box<dyn std::error::Error>> {
+    let path = Path::new(file_path);
+    let file = File::open(path).await?;
+    let buf_reader = tokio::io::BufReader::new(file);
+    let mut segments = Vec::new();
+
+    let mut lines = buf_reader.lines();
+    while let Some(line) = lines.next_line().await? {
+        let metadata: Metadata = serde_json::from_str(&line)?;
+        segments.push(metadata);
+    }
+
+    Ok(segments)
 }
 
 async fn get_file_size(file_path: &str) -> u64 {

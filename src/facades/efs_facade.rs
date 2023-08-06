@@ -7,10 +7,11 @@ use tokio::fs::{self, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Metadata {
-    creation_date: String,
-    range: String,
+pub struct Metadata {
+    start: i64,
+    end: i64,
     compression: String,
+    creation_date: String,
 }
 
 async fn create_dir(dir_name: &str) -> Result<(), tokio::io::Error> {
@@ -72,18 +73,17 @@ pub async fn read_file(file_path: &String) -> Result<Vec<u8>, Box<dyn Error>> {
 pub async fn write(bytes: Vec<u8>, archive_name: &str, start: i64, end: i64) -> Result<(), String> {
     create_dir(archive_name).await;
 
-    let offset_range: Range<i64> = start..end;
-
     let creation_date = Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
 
-    let offset_range_string = format!("{}-{}", offset_range.start, offset_range.end);
+    let offset_range_string = format!("{}-{}", start, end);
     let bytes_file_path = format!("{}/{}", archive_name, offset_range_string);
     let manifest_file_path = format!("{}/{}.{}", archive_name, offset_range_string, "manifest");
 
     let content = Metadata {
+        start: start,
+        end: end,
+        compression: "GZ".to_string(),
         creation_date: creation_date.to_string(),
-        range: offset_range_string,
-        compression: "Gzip".to_string(),
     };
     let metadata = serde_json::to_string(&content).unwrap();
 
