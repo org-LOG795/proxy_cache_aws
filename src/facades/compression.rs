@@ -23,7 +23,7 @@ mod compression_test {
     use std::{fs, path::Path};
     
     fn load_test_file() -> Result<Vec<u8>, String> {
-        let path = Path::new("test_files/poem.txt");
+        let path = Path::new("test/poem.txt");
         fs::read(path).map_err(|e| e.to_string())
     }   
 
