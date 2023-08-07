@@ -12,7 +12,6 @@ fn get_file_path(collection: String) -> String {
     format!("{collection}-{pid}-{date}", collection=collection, pid = id(), date = get_current_date())
 }
 
-
 pub async fn append_bytes_collection(collection: String, bytes: Vec<u8>) -> Result<(String, u64, u64), String> {
     let file_path = get_file_path(collection);
 

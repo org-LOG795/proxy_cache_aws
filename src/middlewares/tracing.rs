@@ -37,6 +37,8 @@ pub async fn tracing_fn<B>(request: Request<B>, next: Next<B>) -> Response {
         request_time = %request_time,
         "Request processed"
     );
+
+    //println!("{} {} => {} ({}ms)", method, url, res_status, request_time);
     
     response
 }
