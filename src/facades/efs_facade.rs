@@ -14,14 +14,12 @@ fn get_file_path(collection: String) -> String {
 
 pub async fn append_bytes_collection(collection: String, bytes: Vec<u8>) -> Result<(String, u64, u64), String> {
     let file_path = get_file_path(collection);
-
     //We append to a file. If file doesn't exists, we create it.
     match OpenOptions::new().append(true).create(true).open(&format!("{}.gzip", file_path)).await {
         Ok(mut file) => {
-            let before_size = file.metadata().await.map_err(|e| e.to_string())?.len();
             file.write_all(bytes.as_slice()).await.map_err(|e| e.to_string())?;
             let after_size = file.metadata().await.map_err(|e| e.to_string())?.len();
-            Ok((file_path, before_size, after_size))
+            Ok((file_path, (after_size - bytes.len() as u64), after_size))
         },
         Err(error) => match error.kind() {
             _ => Err(error.to_string()),
