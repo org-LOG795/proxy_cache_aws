@@ -33,9 +33,9 @@ pub async fn archive_to_s3(
     for directory in directories_list {
         let directory_path = format!("{}/{}", master_directory_path, directory);
 
-        let directory_path_clone = directory_path.clone();
+        // let directory_path_clone = directory_path.clone();
 
-        let mut files_list = match fs::read_dir(directory_path).await {
+        let mut files_list = match fs::read_dir(&directory_path.clone()).await {
             Ok(files) => files,
             Err(err) => {
                 return Err(format!("Error reading directory: {}", err));
@@ -95,14 +95,14 @@ pub async fn archive_to_s3(
         )
         .await;
 
-        let file_size = get_file_size(&directory_path_clone).await;
+        let file_size = get_file_size(&directory_path.clone()).await;
         let part_size = calculate_part_size(file_size);
 
         let s3_client = s3::init_client();
-        match s3::upload_file_multipart(bucket_name, &directory_path_clone, &directory, part_size, s3_client.clone()).await {
-            Ok(_) => (),
-            Err(e) => return Err(format!("Failed to upload file: {}", e)),
-        }
+        // match s3::upload_file_multipart(bucket_name, &directory_path.clone(), &directory, part_size, s3_client.clone()).await {
+        //     Ok(_) => (),
+        //     Err(e) => return Err(format!("Failed to upload file: {}", e)),
+        // }
 
         let directory_path_for_delete = format!("{}/{}", master_directory_path, directory);
         efs_facade::delete(&directory_path_for_delete).await;
