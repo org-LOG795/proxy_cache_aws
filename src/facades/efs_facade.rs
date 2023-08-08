@@ -1,6 +1,9 @@
-use std::process::id;
+use std::{process::id, env, alloc::System};
 use chrono::{Utc, Datelike};
+use serde::{Serialize, Deserialize};
 use tokio::{fs::OpenOptions, io::{AsyncWriteExt, AsyncSeekExt, AsyncReadExt, self}};
+
+use super::compression;
 
 
 fn get_current_date() -> String {
@@ -14,12 +17,15 @@ pub fn get_file_path(collection: String) -> String {
 
 pub async fn append_bytes_collection(collection: String, bytes: Vec<u8>) -> Result<(String, u64, u64), String> {
     let file_path = get_file_path(collection);
+    let base = env::var("BASE_PATH").unwrap_or('/'.to_string()).to_string();
     //We append to a file. If file doesn't exists, we create it.
-    match OpenOptions::new().append(true).create(true).open(&format!("{}.gzip", file_path)).await {
+    match OpenOptions::new().append(true).create(true).open(&format!("{base}/{file_path}.gzip", base=base, file_path=file_path)).await {
         Ok(mut file) => {
             file.write_all(bytes.as_slice()).await.map_err(|e| e.to_string())?;
-            let after_size = file.metadata().await.map_err(|e| e.to_string())?.len();
-            Ok((file_path, (after_size - bytes.len() as u64), after_size))
+            let after_size = file.seek(io::SeekFrom::Current(0)).await.unwrap();
+            let before_size = after_size - bytes.len() as u64;
+            //println!("BEFORE => {}\nAFTER=> {}", before_size, after_size);
+            Ok((file_path, before_size, after_size))
         },
         Err(error) => match error.kind() {
             _ => Err(error.to_string()),
@@ -28,7 +34,8 @@ pub async fn append_bytes_collection(collection: String, bytes: Vec<u8>) -> Resu
 }
 
 pub async fn get_collection_byte_range(file_path: String, start: u64, end: u64) -> Result<Option<Vec<u8>>, String> {
-    match OpenOptions::new().read(true).open(&format!("{}.gzip", file_path)).await {
+    let base = env::var("BASE_PATH").unwrap_or('/'.to_string()).to_string();
+    match OpenOptions::new().read(true).open(&format!("{base}/{}.gzip", file_path, base=base)).await {
         Ok(mut file) => {
             let mut buffer: Vec<u8> = Vec::new();
             file.seek(tokio::io::SeekFrom::Start(start)).await.map_err(|e| e.to_string())?;
@@ -40,5 +47,43 @@ pub async fn get_collection_byte_range(file_path: String, start: u64, end: u64) 
             io::ErrorKind::NotFound => Ok(None),
             _ => Err(err.to_string()),
         }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Metadata {
+    creation_date: String,
+    content_type: String,
+    compression: String,
+    source: String,
+    start: u64,
+    end: u64
+}   
+
+impl Metadata {
+    pub fn new(content_type: String, compression: String, source: String, start: u64, end: u64) -> Metadata {
+        Metadata { 
+            creation_date: Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+            content_type: content_type,
+            compression: compression,
+            source: source,
+            start: start,
+            end: end 
+        }
+    }
+}
+
+pub async fn write_metadata(collection: String, meta: Metadata) -> Result<(), String> {
+    let file_path = get_file_path(collection);
+    let base = env::var("BASE_PATH").unwrap_or('/'.to_string()).to_string();
+    let meta_str = format!("{}\n", serde_json::to_string(&meta).map_err(|e| e.to_string())?);
+
+    //We append to a file. If file doesn't exists, we create it.
+    match OpenOptions::new().append(true).create(true).open(&format!("{base}/{file_path}.manifest", base=base, file_path=file_path)).await {
+        Ok(mut file) => {
+            file.write_all(meta_str.as_bytes()).await.map_err(|e| e.to_string())?;
+            Ok(())
+        },
+        Err(e) => Err(e.to_string())
     }
 }

@@ -27,17 +27,17 @@ lazy_static! {
 }
 
 pub fn gzip_compress(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
-    let timer = COMPRESSION_DURATION
-        .with_label_values(&["compress"])
-        .start_timer();
-    COMPRESSION_COUNT.with_label_values(&["compress"]).inc();
-    FILE_SIZE.inc_by(bytes.len() as u64);
+    // let timer = COMPRESSION_DURATION
+    //     .with_label_values(&["compress"])
+    //     .start_timer();
+    // COMPRESSION_COUNT.with_label_values(&["compress"]).inc();
+    // FILE_SIZE.inc_by(bytes.len() as u64);
 
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(&bytes).map_err(|op| op.to_string())?;
     let result = encoder.finish().map_err(|op| op.to_string());
 
-    timer.observe_duration();
+    //timer.observe_duration();
     result
 }
 

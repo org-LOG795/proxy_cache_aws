@@ -30,7 +30,9 @@ fn create_addr(host: &str, port: &str) -> Result<SocketAddr, String> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing::init_tracing()?;
+    if env::var("WITH_PROMETHEUS").map(|v| v == "true").unwrap_or(true) {
+        tracing::init_tracing()?;
+    }
 
     // build our application with a route
     let app = Router::new()
@@ -44,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Create app url
     let addr = create_addr(&app_host, &app_port);
     
-    test_prometheus();
+    //test_prometheus();
 
     match addr {
         Ok(valid_addr) => {

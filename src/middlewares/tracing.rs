@@ -4,7 +4,7 @@ use axum::{
     middleware::Next
 };
 use tracing::info;
-use std::time::Instant;
+use std::{time::Instant, env};
 use opentelemetry::global;
 use tracing_subscriber::{
     fmt, layer::SubscriberExt, util::SubscriberInitExt,
@@ -30,16 +30,19 @@ pub async fn tracing_fn<B>(request: Request<B>, next: Next<B>) -> Response {
     
     // uncomment in production
     //Log tracing information
-    info!(
-        method = %method,
-        url = %url,
-        headers = %headers,
-        res_status = %res_status,
-        request_time = %request_time,
-        "Request processed"
-    );
+    if env::var("WITH_PROMETHEUS").map(|v| v == "true").unwrap_or(true) {
+        info!(
+            method = %method,
+            url = %url,
+            headers = %headers,
+            res_status = %res_status,
+            request_time = %request_time,
+            "Request processed"
+        );
+    } else {
+       // println!("{} {} => {} ({}ms)", method, url, res_status, request_time);
+    }
 
-    //println!("{} {} => {} ({}ms)", method, url, res_status, request_time);
     
     response
 }
