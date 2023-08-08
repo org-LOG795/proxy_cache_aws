@@ -28,6 +28,7 @@ pub async fn tracing_fn<B>(request: Request<B>, next: Next<B>) -> Response {
     //The request time (in ms)
     let request_time = start.elapsed().as_millis().to_string();
     
+    // uncomment in production
     //Log tracing information
     info!(
         method = %method,
@@ -43,35 +44,12 @@ pub async fn tracing_fn<B>(request: Request<B>, next: Next<B>) -> Response {
     response
 }
 
-pub fn init_tracing_with_jaeger() -> Result<(), Box<dyn std::error::Error>> {
-    global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
-    // Sets up the machinery needed to export data to Jaeger
-    let tracer = opentelemetry_jaeger::new_pipeline()
-        .with_service_name("Proxy_cache_aws")
-        .install_simple()?;
+pub fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
+    // Create a tracing layer that logs to stdout in JSON format
+    let json_layer = fmt::Layer::new().json();
 
-    // Create a tracing layer with the configured tracer
-    let opentelemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-
-    // The SubscriberExt and SubscriberInitExt traits are needed to extend the
-    // Registry to accept `opentelemetry (the OpenTelemetryLayer type).
-    tracing_subscriber::registry()
-        .with(opentelemetry)
-        // Log to stdout in JSON format
-        .with(fmt::Layer::new().json())
-        .try_init()?;
+    // Initialize the tracing subscriber with the JSON layer
+    tracing_subscriber::registry().with(json_layer).try_init()?;
 
     Ok(())
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_init_tracing_with_jaeger() {
-        let result = init_tracing_with_jaeger();
-        assert!(result.is_ok());
-    }
 }
