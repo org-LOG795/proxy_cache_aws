@@ -144,7 +144,7 @@ mod efs_facade_test {
     #[tokio::test]
     async fn test_read() {
         let archive_name = "archive-test-read";
-        let test_file_path = format!("{}", "test_files/lorem.txt");
+        let test_file_path = format!("{}", "test/lorem.txt");
 
         let data = read_file(&test_file_path).await;
         assert!(data.is_ok());
@@ -165,7 +165,7 @@ mod efs_facade_test {
     async fn test_write() {
         // Prepare
         let file_name = "archive-test-write";
-        let test_file_path = format!("{}", "test_files/lorem.txt");
+        let test_file_path = format!("{}", "test/lorem.txt");
 
         let data = read_file(&test_file_path).await;
         assert!(data.is_ok());

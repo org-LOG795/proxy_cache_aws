@@ -157,7 +157,7 @@ mod archivist_test {
         fs::create_dir(directory_name).await;
         let file_name = "test-directory/archive-test-write";
         let file_name_2 = "test-directory/archive-test-write-2";
-        let test_file_path = format!("{}", "test_files/lorem.txt");
+        let test_file_path = format!("{}", "test/lorem.txt");
 
         let data = efs_facade::read_file(&test_file_path).await;
         assert!(data.is_ok());
