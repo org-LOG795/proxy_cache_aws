@@ -30,16 +30,16 @@ pub async fn tracing_fn<B>(request: Request<B>, next: Next<B>) -> Response {
     
     // uncomment in production
     //Log tracing information
-    // info!(
-    //     method = %method,
-    //     url = %url,
-    //     headers = %headers,
-    //     res_status = %res_status,
-    //     request_time = %request_time,
-    //     "Request processed"
-    // );
+    info!(
+        method = %method,
+        url = %url,
+        headers = %headers,
+        res_status = %res_status,
+        request_time = %request_time,
+        "Request processed"
+    );
 
-     println!("{} {} => {} ({}ms)", method, url, res_status, request_time);
+    //println!("{} {} => {} ({}ms)", method, url, res_status, request_time);
     
     response
 }
