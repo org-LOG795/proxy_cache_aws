@@ -33,6 +33,8 @@ pub async fn archive_to_s3(
     for directory in directories_list {
         let directory_path = format!("{}/{}", master_directory_path, directory);
 
+        let directory_path_clone = directory_path.clone();
+
         let mut files_list = match fs::read_dir(directory_path).await {
             Ok(files) => files,
             Err(err) => {
@@ -93,7 +95,15 @@ pub async fn archive_to_s3(
         )
         .await;
 
-        // s3::upload_file_multipart(bucket_name, &directory_path, &directory, part_size).await;
+        let file_size = get_file_size(&directory_path_clone).await;
+        let part_size = calculate_part_size(file_size);
+
+        let s3_client = s3::init_client();
+        match s3::upload_file_multipart(bucket_name, &directory_path_clone, &directory, part_size, s3_client.clone()).await {
+            Ok(_) => (),
+            Err(e) => return Err(format!("Failed to upload file: {}", e)),
+        }
+
         let directory_path_for_delete = format!("{}/{}", master_directory_path, directory);
         efs_facade::delete(&directory_path_for_delete).await;
     }
@@ -125,16 +135,12 @@ async fn get_file_size(file_path: &str) -> u64 {
 }
 
 fn calculate_part_size(file_size: u64) -> usize {
-    // Adjust the part size calculation according to the file size
     if file_size > 5_000_000_000_000 {
-        // If file size is larger than 5TB
-        100_000_000 // Use a part size of 100MB
+        100_000_000 //100MB
     } else if file_size > 100_000_000 {
-        // If file size is larger than 100MB
-        10_000_000 // Use a part size of 10MB
+        10_000_000 //10MB
     } else {
-        // If file size is smaller than 100MB
-        8_000_000 // Use the default part size of 8MB
+        8_000_000 //8MB
     }
 }
 
@@ -162,7 +168,8 @@ mod archivist_test {
         efs_facade::write(bytes.clone(), file_name, 574, 1148).await;
         efs_facade::write(bytes.clone(), file_name_2, 0, 574).await;
 
-        let archivist = archive_to_s3(directory_name, "bucket", 64).await;
+        //let archivist = archive_to_s3(directory_name, "bucket", 64).await;
+        let archivist = archive_to_s3(file_name, "test-bucket-eddbf355-e028-43d7-9085-8e346a20287e", 1).await;
         assert!(archivist.is_ok());
         let deleted = efs_facade::delete(directory_name).await;
         assert!(deleted.is_ok());

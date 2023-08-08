@@ -120,7 +120,7 @@ pub async fn upload_file_multipart(
                         e_tag: part_output.e_tag.clone(),
                         part_number: Some(part_number),
                     });
-                    info!(
+                    println!(
                         "Uploaded part {} with ETag {}",
                         part_number,
                         part_output.e_tag.clone().unwrap_or_default()
@@ -139,7 +139,7 @@ pub async fn upload_file_multipart(
                             ..Default::default()
                         };
                         client.abort_multipart_upload(abort_req).await?;
-                        info!("Upload of file aborted: {}", file_name);
+                        println!("Upload of file aborted: {}", file_name);
                         return Err(Box::new(e));
                     } else {
                         // Exponential backoff: Wait for 2^(attempts - 1) seconds
