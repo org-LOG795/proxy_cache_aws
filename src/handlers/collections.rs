@@ -127,6 +127,7 @@ mod tests {
     use tokio_postgres::Config;
     use super::*;
     use facades::compression::{gzip_decompress as decompress, gzip_compress as compress};
+    use facades::efs_facade::get_file_path;
 
     fn load_test_files() -> Vec<Vec<u8>> {
         let mut files: Vec<Vec<u8>> = Vec::new();
@@ -163,16 +164,15 @@ mod tests {
         for bytes in test_files.iter() {
             let collection_name = test_collection_name.clone();
             //Add the value
-            let post_res = post_handler(collection_name, bytes.to_vec()).await;
+            let post_res = post_handler(collection_name.clone(), bytes.to_vec()).await;
             assert!(post_res.is_ok());
 
             let file_path = post_res.unwrap();
-
-            let params = extract_query_params(&file_path);
-
+            let params = extract_query_params(&file_path.clone());
             let start = params.get("start").unwrap().parse::<u64>().unwrap();
             let end = params.get("end").unwrap().parse::<u64>().unwrap();
-            let get_res = get_handler(test_collection_name.clone(), start, end).await;
+
+            let get_res = get_handler(get_file_path(collection_name), start, end).await;
             assert!(get_res.is_ok());
             assert!(get_res.as_ref().unwrap().is_some());
 
@@ -181,12 +181,12 @@ mod tests {
             //Validate that the get function works
             assert_eq!(compress(bytes.clone()).unwrap(), compressed_bytes);
 
-            //Make sure the values are the same
-            assert_eq!(decompress(compressed_bytes.clone()).unwrap(), bytes.clone())
-        }
+            let decompress = decompress(compressed_bytes.clone()).unwrap();
 
-        //Cleanup
-        delete_test_folders()
+            assert_eq!(decompress.len(), bytes.len());
+            //Make sure the values are the same
+            assert_eq!(decompress, bytes.clone())
+        }
     }
 
 }

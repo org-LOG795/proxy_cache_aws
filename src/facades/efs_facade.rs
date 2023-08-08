@@ -8,7 +8,7 @@ fn get_current_date() -> String {
     format!("{:04}-{:02}-{:02}", current_date.year(), current_date.month(), current_date.day())
 }
 
-fn get_file_path(collection: String) -> String {
+pub fn get_file_path(collection: String) -> String {
     format!("{collection}-{pid}-{date}", collection=collection, pid = id(), date = get_current_date())
 }
 
