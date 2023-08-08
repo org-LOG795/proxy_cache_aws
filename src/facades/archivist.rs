@@ -169,7 +169,7 @@ mod archivist_test {
         efs_facade::write(bytes.clone(), file_name_2, 0, 574).await;
 
         //let archivist = archive_to_s3(directory_name, "bucket", 64).await;
-        let archivist = archive_to_s3(file_name, "test-bucket-eddbf355-e028-43d7-9085-8e346a20287e", 1).await;
+        let archivist = archive_to_s3(directory_name, "rusty-bucket-2834", 1).await;
         assert!(archivist.is_ok());
         let deleted = efs_facade::delete(directory_name).await;
         assert!(deleted.is_ok());
