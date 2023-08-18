@@ -3,12 +3,12 @@ use middlewares::tracing::tracing_fn;
 
 pub mod handlers;
 use handlers::collections::collection_handler;
+use handlers::general::pong;
 use handlers::metrics::handle_metrics;
 
 pub mod facades;
 
 use crate::facades::compression::{gzip_compress, gzip_decompress};
-use crate::middlewares::tracing;
 use crate::middlewares::tracing;
 use axum::{
     middleware,
