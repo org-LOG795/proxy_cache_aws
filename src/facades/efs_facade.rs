@@ -2,7 +2,7 @@ use chrono::{Datelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::{alloc::System, env, process::id};
 use tokio::{
-    fs::OpenOptions,
+    fs::{self, OpenOptions},
     io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
 
@@ -25,6 +25,27 @@ pub fn get_file_path(collection: String) -> String {
         pid = id(),
         date = get_current_date()
     )
+}
+
+pub async fn get_directories_list(directory_path: &str) -> Result<Vec<String>, String> {
+    let mut directories = Vec::new();
+
+    let mut dir = fs::read_dir(directory_path)
+        .await
+        .map_err(|err| err.to_string())?;
+
+    while let Ok(Some(directory)) = dir.next_entry().await {
+        let path = directory.path();
+        if path.is_dir() {
+            if let Some(directory_name) = path.file_name() {
+                if let Some(directory_name_str) = directory_name.to_str() {
+                    directories.push(directory_name_str.to_string());
+                }
+            }
+        }
+    }
+
+    Ok(directories)
 }
 
 pub async fn append_bytes_collection(

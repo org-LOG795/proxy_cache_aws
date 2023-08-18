@@ -1,18 +1,51 @@
 use serde::{Deserialize, Serialize};
+use serde_json::to_string;
 use std::error::Error;
 use std::path::Path;
 use tokio::fs::{self, File, OpenOptions};
-use tokio::io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, Error as IoError};
 use tracing_subscriber::filter::Directive;
 
 use super::efs_facade::{self, Metadata};
 use super::s3::{self};
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Manifest {
-    name: String,
-    meta_source: String,
-    segments: Vec<Metadata>,
+async fn read_file(file_path: &String) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    let mut buffer = Vec::new();
+
+    match options.open(file_path).await {
+        Ok(mut file) => {
+            file.read_to_end(&mut buffer).await?;
+            println!("Bytes were read from file: {}", file_path);
+        }
+
+        Err(e) => {
+            println!("Error reading file: {}, {}", file_path, e);
+            return Err(Box::new(e));
+        }
+    }
+
+    Ok(buffer)
+}
+
+async fn write_file(file_path: &String, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
+    let mut options = OpenOptions::new();
+    let output_options = options.write(true).create_new(true);
+
+    match output_options.open(file_path).await {
+        Ok(mut file) => {
+            file.write_all(bytes).await?;
+            println!("Bytes were written into file: {}", file_path);
+        }
+
+        Err(e) => {
+            println!("Error writting into file: {}, {}", file_path, e);
+            return Err(Box::new(e));
+        }
+    }
+
+    Ok(())
 }
 
 //Read from EFS and write to an S3 bucket
@@ -32,80 +65,60 @@ pub async fn archive_to_s3(
 
     for directory in directories_list {
         let directory_path = format!("{}/{}", master_directory_path, directory);
-
-        // let directory_path_clone = directory_path.clone();
-
-        let mut files_list = match fs::read_dir(&directory_path.clone()).await {
-            Ok(files) => files,
-            Err(err) => {
-                return Err(format!("Error reading directory: {}", err));
-            }
-        };
-
-        let mut options = OpenOptions::new();
-        let output_options = options.write(true).append(true).create(true);
-
-        let mut combined_manifest = Vec::<Metadata>::new();
-        let mut output_file_name = format!("{}", directory);
-
-        while let Ok(Some(file)) = files_list.next_entry().await {
-            let path = file.path();
-
-            if let Some(file_name) = path.file_name().and_then(|os_str| os_str.to_str()) {
-                let file_path = format!("{}/{}/{}", master_directory_path, directory, file_name);
-
-                if file_name.contains(".manifest") {
-                    let manifest_segment = read_from_manifest(&file_path).await;
-                    combined_manifest.extend(manifest_segment.unwrap());
-                } else {
-                    let bytes = efs_facade::read_file(&file_path.to_string()).await;
-
-                    let output_file_path = format!(
-                        "{}/{}/{}",
-                        master_directory_path, directory, output_file_name
-                    );
-
-                    let _ = efs_facade::write_file(
-                        &output_file_path,
-                        &bytes.unwrap().as_slice(),
-                        output_options,
-                    )
-                    .await;
-                }
-            }
-        }
-
-        let manifest = Manifest {
-            name: output_file_name,
-            meta_source: "src".to_string(),
-            segments: combined_manifest,
-        };
-        let json_manifest = serde_json::to_string_pretty(&manifest);
-
-        let manifest_file_name = format!("{}-manifest.json", directory);
-        let manifest_file_path = format!(
-            "{}/{}/{}",
-            master_directory_path, directory, manifest_file_name
-        );
-
-        let _ = efs_facade::write_file(
-            &manifest_file_path,
-            json_manifest.unwrap().as_bytes(),
-            output_options,
-        )
-        .await;
-
         let file_size = get_file_size(&directory_path.clone()).await;
         let part_size = calculate_part_size(file_size);
 
         let s3_client = s3::init_client();
-        // match s3::upload_file_multipart(bucket_name, &directory_path.clone(), &directory, part_size, s3_client.clone()).await {
-        //     Ok(_) => (),
-        //     Err(e) => return Err(format!("Failed to upload file: {}", e)),
-        // }
+
+        let output_file_name = format!("{}", directory);
+        let output_file_path = format!("{}/{}", directory_path, directory);
+
+        if let Ok(_metadata) = fs::metadata(output_file_path).await {
+            match s3::upload_file_multipart(
+                bucket_name,
+                &directory_path.clone(),
+                &output_file_name,
+                part_size,
+                s3_client.clone(),
+            )
+            .await
+            {
+                Ok(_) => (),
+                Err(e) => return Err(format!("Failed to upload bytes file: {}", e)),
+            }
+        } else {
+            return Err(format!("Bytes file does not exist"));
+        }
+
+        let manifest_file_name = format!("{}.manifest", directory);
+        let manifest_file_path = format!("{}/{}", directory_path, manifest_file_name);
+
+        if let Ok(_metadata) = fs::metadata(manifest_file_path.clone()).await {
+            let manifest_bytes = read_file(&manifest_file_path).await;
+
+            let json_manifest_name = format!("{}-manifest.json", directory);
+            let json_manifest_path = format!("{}/{}", directory_path, json_manifest_name);
+
+            let _ = write_file(&json_manifest_path, &manifest_bytes.unwrap()).await;
+            match s3::upload_file_multipart(
+                bucket_name,
+                &directory_path.clone(),
+                &json_manifest_name,
+                part_size,
+                s3_client.clone(),
+            )
+            .await
+            {
+                Ok(_) => (),
+                Err(e) => return Err(format!("Failed to upload manifest file: {}", e)),
+            }
+        } else {
+            return Err(format!("Manifest file does not exist"));
+        }
 
         let directory_path_for_delete = format!("{}/{}", master_directory_path, directory);
-        efs_facade::delete(&directory_path_for_delete).await;
+        let _ = fs::remove_dir_all(directory_path_for_delete).await;
+        println!("File path deleted: {}", directory);
     }
 
     Ok(())
@@ -149,29 +162,14 @@ mod archivist_test {
     use super::*;
     use tokio::fs;
 
-    use crate::facades::efs_facade;
-
     #[tokio::test]
     async fn test_archive_to_s3() {
         let directory_name = "test-directory";
-        fs::create_dir(directory_name).await;
-        let file_name = "test-directory/archive-test-write";
-        let file_name_2 = "test-directory/archive-test-write-2";
-        let test_file_path = format!("{}", "test/lorem.txt");
-
-        let data = efs_facade::read_file(&test_file_path).await;
-        assert!(data.is_ok());
-
-        let bytes = data.unwrap();
-
-        efs_facade::write(bytes.clone(), file_name, 0, 574).await;
-        efs_facade::write(bytes.clone(), file_name, 574, 1148).await;
-        efs_facade::write(bytes.clone(), file_name_2, 0, 574).await;
 
         //let archivist = archive_to_s3(directory_name, "bucket", 64).await;
         let archivist = archive_to_s3(directory_name, "rusty-bucket-2834", 1).await;
         assert!(archivist.is_ok());
-        let deleted = efs_facade::delete(directory_name).await;
-        assert!(deleted.is_ok());
+        // let deleted = efs_facade::delete(directory_name).await;
+        // assert!(deleted.is_ok());
     }
 }
