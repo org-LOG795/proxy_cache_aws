@@ -3,11 +3,12 @@ use middlewares::tracing::tracing_fn;
 
 pub mod handlers;
 use handlers::collections::collection_handler;
-use handlers::general::pong;
+use handlers::metrics::handle_metrics;
 
 pub mod facades;
-use facades::postgres_facade::{create_config_from_env, create_pool};
 
+use crate::facades::compression::{gzip_compress, gzip_decompress};
+use crate::middlewares::tracing;
 use crate::middlewares::tracing;
 use axum::{
     middleware,
@@ -30,22 +31,26 @@ fn create_addr(host: &str, port: &str) -> Result<SocketAddr, String> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing::init_tracing_with_jaeger()?;
-
-    let postgres_config = create_config_from_env().expect("Unable to load");
-    let postgres_pool = create_pool(postgres_config, 3).unwrap();
+    if env::var("WITH_PROMETHEUS")
+        .map(|v| v == "true")
+        .unwrap_or(true)
+    {
+        tracing::init_tracing()?;
+    }
 
     // build our application with a route
     let app = Router::new()
         .route("/ping", get(pong))
         .route("/collection/*collection", any(collection_handler))
-        .with_state(postgres_pool)
+        .route("/metrics", get(handle_metrics))
         .layer(middleware::from_fn(tracing_fn));
 
     let app_host = env::var("APP_HOST").unwrap_or("0.0.0.0".to_string());
     let app_port = env::var("APP_PORT").unwrap_or("5000".to_string());
     //Create app url
     let addr = create_addr(&app_host, &app_port);
+
+    //test_prometheus();
 
     match addr {
         Ok(valid_addr) => {
@@ -58,7 +63,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(err) => println!("ABORTING => {}", err.to_string()),
     }
+
     Ok(())
+}
+
+fn test_prometheus() {
+    // Données à compresser
+    let data = b"Hello, world!";
+    println!("Original data: {:?}", data);
+
+    // Compresser les données
+    let compressed_data = gzip_compress(data.to_vec()).unwrap();
+    println!("Compressed data: {:?}", compressed_data);
+
+    // Décompresser les données
+    let decompressed_data = gzip_decompress(compressed_data).unwrap();
+    println!("Decompressed data: {:?}", decompressed_data);
 }
 
 #[cfg(test)]
