@@ -51,8 +51,7 @@ async fn write_file(file_path: &String, bytes: &[u8]) -> Result<(), Box<dyn Erro
 //Read from EFS and write to an S3 bucket
 pub async fn archive_to_s3(
     master_directory_path: &str,
-    bucket_name: &str,
-    part_size: usize,
+    bucket_name: &str
 ) -> Result<(), String> {
     let directories_list = efs_facade::get_directories_list(master_directory_path).await;
 
@@ -73,18 +72,26 @@ pub async fn archive_to_s3(
         let output_file_name = format!("{}", directory);
         let output_file_path = format!("{}/{}", directory_path, directory);
 
-        if let Ok(_metadata) = fs::metadata(output_file_path).await {
+        // let _file = "test/lorem.txt";
+        // let _name = "test-lorem-upload";
+        // let _bucket = "rusty-bucket-5139569297";
+
+        if let Ok(_metadata) = fs::metadata(output_file_path.clone()).await {
             match s3::upload_file_multipart(
-                bucket_name,
-                &directory_path.clone(),
+                &bucket_name,
+                &output_file_path.clone(),
                 &output_file_name,
                 part_size,
                 s3_client.clone(),
             )
             .await
             {
-                Ok(_) => (),
-                Err(e) => return Err(format!("Failed to upload bytes file: {}", e)),
+                Ok(_) => {
+                    println!("Successfully uploaded file to S3: {}", &directory_path);
+                }
+                Err(err) => {
+                    return Err(format!("Error uploading to S3: {}", err));
+                }
             }
         } else {
             return Err(format!("Bytes file does not exist"));
@@ -100,17 +107,22 @@ pub async fn archive_to_s3(
             let json_manifest_path = format!("{}/{}", directory_path, json_manifest_name);
 
             let _ = write_file(&json_manifest_path, &manifest_bytes.unwrap()).await;
+
             match s3::upload_file_multipart(
                 bucket_name,
-                &directory_path.clone(),
+                &&json_manifest_path.clone(),
                 &json_manifest_name,
                 part_size,
                 s3_client.clone(),
             )
             .await
             {
-                Ok(_) => (),
-                Err(e) => return Err(format!("Failed to upload manifest file: {}", e)),
+                Ok(_) => {
+                    println!("Successfully uploaded file to S3: {}", &directory_path);
+                }
+                Err(err) => {
+                    return Err(format!("Error uploading to S3: {}", err));
+                }
             }
         } else {
             return Err(format!("Manifest file does not exist"));
@@ -158,18 +170,16 @@ fn calculate_part_size(file_size: u64) -> usize {
 }
 
 #[cfg(test)]
+#[ignore = "tests need to be ran with a defined bucket name and directory name"]
 mod archivist_test {
     use super::*;
     use tokio::fs;
 
     #[tokio::test]
     async fn test_archive_to_s3() {
-        let directory_name = "test-directory";
+        let directory_name = "";
 
-        //let archivist = archive_to_s3(directory_name, "bucket", 64).await;
-        let archivist = archive_to_s3(directory_name, "rusty-bucket-2834", 1).await;
+        let archivist = archive_to_s3(directory_name, "").await;
         assert!(archivist.is_ok());
-        // let deleted = efs_facade::delete(directory_name).await;
-        // assert!(deleted.is_ok());
     }
 }
