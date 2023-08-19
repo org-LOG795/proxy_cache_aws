@@ -50,8 +50,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //Create app url
     let addr = create_addr(&app_host, &app_port);
 
-    //test_prometheus();
-
     match addr {
         Ok(valid_addr) => {
             // run it
@@ -65,20 +63,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
-}
-
-fn test_prometheus() {
-    // Données à compresser
-    let data = b"Hello, world!";
-    println!("Original data: {:?}", data);
-
-    // Compresser les données
-    let compressed_data = gzip_compress(data.to_vec()).unwrap();
-    println!("Compressed data: {:?}", compressed_data);
-
-    // Décompresser les données
-    let decompressed_data = gzip_decompress(compressed_data).unwrap();
-    println!("Decompressed data: {:?}", decompressed_data);
 }
 
 #[cfg(test)]
