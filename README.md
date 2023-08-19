@@ -1,7 +1,5 @@
 
-
-
-#Metrics
+# Metrics
 
 ## To Start Prometheus and Grafana
 
