@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
-use serde_json::to_string;
 use std::error::Error;
 use std::path::Path;
 use tokio::fs::{self, File, OpenOptions};
-use tokio::io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, Error as IoError};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 use tracing_subscriber::filter::Directive;
 
 use super::efs_facade::{self, Metadata};
@@ -31,10 +30,6 @@ pub async fn archive_to_s3(
 
         let output_file_name = format!("{}", directory);
         let output_file_path = format!("{}/{}", directory_path, directory);
-
-        // let _file = "test/lorem.txt";
-        // let _name = "test-lorem-upload";
-        // let _bucket = "rusty-bucket-5139569297";
 
         if let Ok(_metadata) = fs::metadata(output_file_path.clone()).await {
             match s3::upload_file_multipart(
