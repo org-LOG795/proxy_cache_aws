@@ -9,10 +9,7 @@ use super::efs_facade::{self, Metadata};
 use super::s3::{self};
 
 //Read from EFS and write to an S3 bucket
-pub async fn archive_to_s3(
-    master_directory_path: &str,
-    bucket_name: &str
-) -> Result<(), String> {
+pub async fn archive_to_s3(master_directory_path: &str, bucket_name: &str) -> Result<(), String> {
     let directories_list = efs_facade::get_directories_list(master_directory_path).await;
     let s3_client = s3::init_client();
 
@@ -150,12 +147,12 @@ async fn calculate_part_size(file_size: u64) -> usize {
 }
 
 #[cfg(test)]
-#[ignore = "tests need to be ran with a defined bucket name and directory name"]
 mod archivist_test {
     use super::*;
     use tokio::fs;
 
     #[tokio::test]
+    #[ignore = "tests need to be ran with a defined bucket name and directory name"]
     async fn test_archive_to_s3() {
         let directory_name = "";
 
