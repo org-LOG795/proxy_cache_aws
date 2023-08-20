@@ -2,21 +2,20 @@ pub mod middlewares;
 use middlewares::tracing::tracing_fn;
 
 pub mod handlers;
-use handlers::general::pong;
 use handlers::collections::collection_handler;
+use handlers::general::pong;
 use handlers::metrics::handle_metrics;
 
 pub mod facades;
 
+use crate::facades::compression::{gzip_compress, gzip_decompress};
+use crate::middlewares::tracing;
 use axum::{
+    middleware,
     routing::{any, get},
     Router,
-    middleware
 };
 use std::{env, net::SocketAddr};
-use crate::middlewares::tracing;
-use crate::facades::compression::{gzip_compress, gzip_decompress};
-
 
 #[derive(Clone)]
 pub struct Config {
@@ -25,12 +24,17 @@ pub struct Config {
 
 fn create_addr(host: &str, port: &str) -> Result<SocketAddr, String> {
     let format = format!("{}:{}", host, port);
-    format.parse::<SocketAddr>().map_err(|_| format!("{} is not a valid app address", format))
+    format
+        .parse::<SocketAddr>()
+        .map_err(|_| format!("{} is not a valid app address", format))
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    if env::var("WITH_PROMETHEUS").map(|v| v == "true").unwrap_or(true) {
+    if env::var("WITH_PROMETHEUS")
+        .map(|v| v == "true")
+        .unwrap_or(true)
+    {
         tracing::init_tracing()?;
     }
 
@@ -45,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_port = env::var("APP_PORT").unwrap_or("5000".to_string());
     //Create app url
     let addr = create_addr(&app_host, &app_port);
-    
+
     match addr {
         Ok(valid_addr) => {
             // run it
@@ -55,9 +59,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .await
                 .unwrap();
         }
-        Err(err) => println!("ABORTING => {}", err.to_string())
+        Err(err) => println!("ABORTING => {}", err.to_string()),
     }
-    
+
     Ok(())
 }
 
