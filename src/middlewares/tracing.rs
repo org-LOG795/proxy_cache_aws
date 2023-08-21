@@ -30,7 +30,7 @@ pub async fn tracing_fn<B>(request: Request<B>, next: Next<B>) -> Response {
     
     // uncomment in production
     //Log tracing information
-    if env::var("WITH_PROMETHEUS").map(|v| v == "true").unwrap_or(true) {
+    if env::var("WITH_LOGS").map(|v| v == "true").unwrap_or(true) {
         info!(
             method = %method,
             url = %url,

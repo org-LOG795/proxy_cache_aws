@@ -31,7 +31,7 @@ fn create_addr(host: &str, port: &str) -> Result<SocketAddr, String> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    if env::var("WITH_PROMETHEUS")
+    if env::var("WITH_LOGS")
         .map(|v| v == "true")
         .unwrap_or(true)
     {
