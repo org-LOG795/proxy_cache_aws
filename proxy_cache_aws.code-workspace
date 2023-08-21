@@ -29,7 +29,8 @@
 				"args": [],
 				"envFile": "${workspaceFolder}/dev.env",
 				"cwd": "${workspaceFolder}",
-				"preLaunchTask": "Build app debug"
+				"preLaunchTask": "Build app debug",
+				"terminal": "integrated"
 			}
 		],
 		"compounds": []
